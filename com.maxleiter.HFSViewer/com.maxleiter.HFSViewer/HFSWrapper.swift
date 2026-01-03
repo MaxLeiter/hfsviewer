@@ -23,6 +23,20 @@
 import Foundation
 import Combine
 
+// MARK: - HFS Volume Mode
+
+enum HFSVolumeMode {
+    case readOnly
+    case readWrite
+
+    var hfsMode: Int32 {
+        switch self {
+        case .readOnly: return HFS_MODE_RDONLY
+        case .readWrite: return HFS_MODE_RDWR
+        }
+    }
+}
+
 // MARK: - HFS Error
 
 enum HFSError: Error, LocalizedError {
@@ -30,6 +44,10 @@ enum HFSError: Error, LocalizedError {
     case openFailed(String)
     case operationFailed(String)
     case entryNotFound
+    case readOnlyVolume
+    case writeOperationFailed(String)
+    case fileAlreadyExists(String)
+    case insufficientSpace
 
     var errorDescription: String? {
         switch self {
@@ -37,6 +55,10 @@ enum HFSError: Error, LocalizedError {
         case .openFailed(let msg): return "Failed to open volume: \(msg)"
         case .operationFailed(let msg): return "Operation failed: \(msg)"
         case .entryNotFound: return "File entry not found"
+        case .readOnlyVolume: return "Volume is mounted read-only"
+        case .writeOperationFailed(let msg): return "Write operation failed: \(msg)"
+        case .fileAlreadyExists(let msg): return "File already exists: \(msg)"
+        case .insufficientSpace: return "Insufficient space on volume"
         }
     }
 }
@@ -83,7 +105,7 @@ class HFSFileEntry: Identifiable, Hashable {
     let groupID: UInt32
     let fileMode: UInt16
 
-    private var classicEntryPath: String
+    private(set) var classicEntryPath: String
     private var volume: HFSVolume?
 
     var isDirectory: Bool { fileType == .directory }
@@ -243,6 +265,118 @@ class HFSFileEntry: Identifiable, Hashable {
         return nil
     }
 
+    // MARK: - Write Operations
+
+    func delete() throws {
+        guard let volume = volume else {
+            throw HFSError.operationFailed("Volume reference lost")
+        }
+        guard !volume.isReadOnly else {
+            throw HFSError.readOnlyVolume
+        }
+        guard let volumePtr = volume.volumePointer else {
+            throw HFSError.operationFailed("Volume not mounted")
+        }
+
+        if fileType == .directory {
+            guard hfs_rmdir(volumePtr, classicEntryPath) == 0 else {
+                if let errorMsg = hfs_error {
+                    throw HFSError.writeOperationFailed(String(cString: errorMsg))
+                }
+                throw HFSError.writeOperationFailed("Failed to remove directory")
+            }
+        } else {
+            guard hfs_delete(volumePtr, classicEntryPath) == 0 else {
+                if let errorMsg = hfs_error {
+                    throw HFSError.writeOperationFailed(String(cString: errorMsg))
+                }
+                throw HFSError.writeOperationFailed("Failed to delete file")
+            }
+        }
+    }
+
+    func rename(to newName: String) throws {
+        guard let volume = volume else {
+            throw HFSError.operationFailed("Volume reference lost")
+        }
+        guard !volume.isReadOnly else {
+            throw HFSError.readOnlyVolume
+        }
+        guard let volumePtr = volume.volumePointer else {
+            throw HFSError.operationFailed("Volume not mounted")
+        }
+
+        // Build new path with the same parent
+        let components = classicEntryPath.split(separator: ":")
+        let newPath: String
+        if components.count > 1 {
+            let parentComponents = components.dropLast()
+            newPath = parentComponents.joined(separator: ":") + ":" + newName
+        } else {
+            newPath = ":" + newName
+        }
+
+        guard hfs_rename(volumePtr, classicEntryPath, newPath) == 0 else {
+            if let errorMsg = hfs_error {
+                throw HFSError.writeOperationFailed(String(cString: errorMsg))
+            }
+            throw HFSError.writeOperationFailed("Failed to rename")
+        }
+
+        // Update internal path
+        classicEntryPath = newPath
+    }
+
+    func copyTo(destinationPath: String) throws {
+        guard let volume = volume else {
+            throw HFSError.operationFailed("Volume reference lost")
+        }
+        guard !volume.isReadOnly else {
+            throw HFSError.readOnlyVolume
+        }
+
+        if fileType == .directory {
+            // Create destination directory
+            _ = try volume.createDirectory(at: destinationPath)
+
+            // Recursively copy children
+            let children = try getChildren()
+            for child in children {
+                let childDestPath = destinationPath + ":" + child.name
+                try child.copyTo(destinationPath: childDestPath)
+            }
+        } else {
+            // Copy file data
+            let data = try readData()
+            let tempFile = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+            try data.write(to: tempFile)
+            try volume.importFile(sourcePath: tempFile, destinationPath: destinationPath)
+            try? FileManager.default.removeItem(at: tempFile)
+        }
+    }
+
+    func moveTo(destinationPath: String) throws {
+        guard let volume = volume else {
+            throw HFSError.operationFailed("Volume reference lost")
+        }
+        guard !volume.isReadOnly else {
+            throw HFSError.readOnlyVolume
+        }
+        guard let volumePtr = volume.volumePointer else {
+            throw HFSError.operationFailed("Volume not mounted")
+        }
+
+        guard hfs_rename(volumePtr, classicEntryPath, destinationPath) == 0 else {
+            if let errorMsg = hfs_error {
+                throw HFSError.writeOperationFailed(String(cString: errorMsg))
+            }
+            throw HFSError.writeOperationFailed("Failed to move")
+        }
+
+        // Update internal path
+        classicEntryPath = destinationPath
+    }
+
     // MARK: - Hashable
 
     static func == (lhs: HFSFileEntry, rhs: HFSFileEntry) -> Bool {
@@ -259,18 +393,24 @@ class HFSFileEntry: Identifiable, Hashable {
 class HFSVolume: ObservableObject {
     let path: String
     let name: String
+    let mode: HFSVolumeMode
+    let isDevicePath: Bool
     private(set) var rootEntry: HFSFileEntry?
 
     fileprivate var volumePointer: OpaquePointer?
 
-    init(path: String) throws {
+    var isReadOnly: Bool { mode == .readOnly }
+
+    init(path: String, mode: HFSVolumeMode = .readOnly) throws {
         self.path = path
+        self.mode = mode
+        self.isDevicePath = path.starts(with: "/dev/")
         self.volumePointer = nil
         self.rootEntry = nil
 
         // Try to mount the volume
         // Partition 0 means auto-detect
-        guard let vol = hfs_mount(path, 0, HFS_MODE_RDONLY) else {
+        guard let vol = hfs_mount(path, 0, mode.hfsMode) else {
             if let errorMsg = hfs_error {
                 throw HFSError.openFailed("Classic HFS: \(String(cString: errorMsg))")
             }
@@ -314,5 +454,93 @@ class HFSVolume: ObservableObject {
 
     deinit {
         close()
+    }
+
+    // MARK: - Write Operations
+
+    func createDirectory(at path: String) throws -> HFSFileEntry {
+        guard !isReadOnly else { throw HFSError.readOnlyVolume }
+        guard let vol = volumePointer else {
+            throw HFSError.operationFailed("Volume not mounted")
+        }
+
+        guard hfs_mkdir(vol, path) == 0 else {
+            if let errorMsg = hfs_error {
+                let error = String(cString: errorMsg)
+                if error.contains("exists") {
+                    throw HFSError.fileAlreadyExists(path)
+                }
+                throw HFSError.writeOperationFailed(error)
+            }
+            throw HFSError.writeOperationFailed("Failed to create directory")
+        }
+
+        // Get the new directory entry
+        var dirent = hfsdirent()
+        guard hfs_stat(vol, path, &dirent) == 0 else {
+            throw HFSError.operationFailed("Directory created but cannot stat")
+        }
+
+        // Extract parent path
+        let components = path.split(separator: ":")
+        let parentPath = components.count > 1 ?
+            components.dropLast().joined(separator: ":") : ":"
+
+        return HFSFileEntry(
+            classicEntry: dirent,
+            parentPath: String(parentPath),
+            volume: self
+        )
+    }
+
+    func pathExists(_ path: String) -> Bool {
+        guard let vol = volumePointer else { return false }
+        var dirent = hfsdirent()
+        return hfs_stat(vol, path, &dirent) == 0
+    }
+
+    func importFile(sourcePath: URL, destinationPath: String) throws {
+        guard !isReadOnly else { throw HFSError.readOnlyVolume }
+        guard let vol = volumePointer else {
+            throw HFSError.operationFailed("Volume not mounted")
+        }
+
+        // Read source file
+        let data = try Data(contentsOf: sourcePath)
+
+        // Create file on HFS volume
+        guard let file = hfs_create(vol, destinationPath, "    ", "    ") else {
+            if let errorMsg = hfs_error {
+                let error = String(cString: errorMsg)
+                if error.contains("exists") {
+                    throw HFSError.fileAlreadyExists(destinationPath)
+                } else if error.contains("space") {
+                    throw HFSError.insufficientSpace
+                }
+                throw HFSError.writeOperationFailed(error)
+            }
+            throw HFSError.writeOperationFailed("Failed to create file")
+        }
+        defer { hfs_close(file) }
+
+        // Write data in chunks
+        let chunkSize = 32768 // 32KB chunks
+        var offset = 0
+
+        while offset < data.count {
+            let remainingBytes = data.count - offset
+            let bytesToWrite = min(chunkSize, remainingBytes)
+
+            let bytesWritten = data.withUnsafeBytes { ptr in
+                let buffer = ptr.baseAddress!.advanced(by: offset)
+                return hfs_write(file, buffer, UInt(bytesToWrite))
+            }
+
+            guard bytesWritten > 0 else {
+                throw HFSError.writeOperationFailed("Failed to write data")
+            }
+
+            offset += Int(bytesWritten)
+        }
     }
 }

@@ -94,4 +94,12 @@ int hfs_chdir(hfsvol *vol, const char *path);
 unsigned long hfs_getcwd(hfsvol *vol);
 int hfs_setcwd(hfsvol *vol, unsigned long cnid);
 
+// libhfs write operations
+hfsfile *hfs_create(hfsvol *vol, const char *path, const char *type, const char *creator);
+unsigned long hfs_write(hfsfile *file, const void *buf, unsigned long len);
+int hfs_mkdir(hfsvol *vol, const char *path);
+int hfs_rmdir(hfsvol *vol, const char *path);
+int hfs_delete(hfsvol *vol, const char *path);
+int hfs_rename(hfsvol *vol, const char *srcpath, const char *dstpath);
+
 #endif /* HFSViewer_Bridging_Header_h */

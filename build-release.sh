@@ -44,8 +44,13 @@ mkdir -p "$RELEASE_DIR"
 ZIP_NAME="HFSViewer-$VERSION.zip"
 echo "→ Creating $ZIP_NAME..."
 
+# Get absolute paths
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+RELEASE_PATH="$SCRIPT_DIR/$RELEASE_DIR/$ZIP_NAME"
+
+# Create zip from the directory containing the app
 cd "$(dirname "$APP_PATH")"
-zip -r -q "../../../$RELEASE_DIR/$ZIP_NAME" "$(basename "$APP_PATH")"
+zip -r -q "$RELEASE_PATH" "$(basename "$APP_PATH")"
 cd - > /dev/null
 
 echo "✓ Release built successfully!"

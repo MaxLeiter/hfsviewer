@@ -28,6 +28,10 @@ struct ContentView: View {
     @StateObject private var viewModel = HFSViewModel()
     @State private var showOpenPanel = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var enableWriteMode = false
+    @State private var showImportFilePicker = false
+    @State private var showNewFolderDialog = false
+    @State private var showDeleteConfirmation = false
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -72,6 +76,29 @@ struct ContentView: View {
                     }
                     .pickerStyle(.segmented)
                     .help("View Mode")
+
+                    // Write operation buttons
+                    if viewModel.volume?.isReadOnly == false {
+                        Divider()
+
+                        Button(action: { showNewFolderDialog = true }) {
+                            Label("New Folder", systemImage: "folder.badge.plus")
+                        }
+                        .disabled(viewModel.currentDirectory == nil)
+                        .help("Create a new folder")
+
+                        Button(action: { showImportFilePicker = true }) {
+                            Label("Import", systemImage: "square.and.arrow.down")
+                        }
+                        .disabled(viewModel.currentDirectory == nil)
+                        .help("Import files from your Mac")
+
+                        Button(action: { showDeleteConfirmation = true }) {
+                            Label("Delete", systemImage: "trash")
+                        }
+                        .disabled(viewModel.selectedEntry == nil)
+                        .help("Delete selected item")
+                    }
                 }
             }
 
@@ -103,7 +130,8 @@ struct ContentView: View {
             switch result {
             case .success(let urls):
                 if let url = urls.first {
-                    viewModel.openVolume(at: url)
+                    let mode: HFSVolumeMode = enableWriteMode ? .readWrite : .readOnly
+                    viewModel.openVolumeWithMode(at: url, mode: mode)
                 }
             case .failure(let error):
                 viewModel.errorMessage = error.localizedDescription
@@ -115,11 +143,79 @@ struct ContentView: View {
         } message: {
             Text(viewModel.errorMessage ?? "Unknown error")
         }
+        .alert("Modify Device Volume?", isPresented: $viewModel.showWriteWarning) {
+            Button("Cancel", role: .cancel) {
+                viewModel.pendingOperation = nil
+            }
+            Button("Continue") {
+                viewModel.executeWriteOperation()
+            }
+            Button("Don't Ask Again") {
+                viewModel.preferences.suppressDeviceWarnings = true
+                viewModel.executeWriteOperation()
+            }
+        } message: {
+            Text("You are about to modify a device volume at \(viewModel.volumePath ?? "unknown path"). This will directly modify the physical device.\n\nWrite operations are in BETA. Please ensure you have backups before proceeding.")
+        }
+        .alert("Delete Item?", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                guard let entry = viewModel.selectedEntry else { return }
+                viewModel.checkWriteOperationSafety {
+                    Task {
+                        do {
+                            try await viewModel.deleteEntry(entry)
+                        } catch {
+                            await MainActor.run {
+                                viewModel.errorMessage = error.localizedDescription
+                                viewModel.showError = true
+                            }
+                        }
+                    }
+                }
+            }
+        } message: {
+            if let entry = viewModel.selectedEntry {
+                Text("Are you sure you want to delete \"\(entry.name)\"? This action cannot be undone.")
+            }
+        }
+        .fileImporter(
+            isPresented: $showImportFilePicker,
+            allowedContentTypes: [.item],
+            allowsMultipleSelection: true
+        ) { result in
+            switch result {
+            case .success(let urls):
+                guard let directory = viewModel.currentDirectory else { return }
+                viewModel.checkWriteOperationSafety {
+                    Task {
+                        do {
+                            try await viewModel.importFiles(urls, to: directory)
+                        } catch {
+                            await MainActor.run {
+                                viewModel.errorMessage = error.localizedDescription
+                                viewModel.showError = true
+                            }
+                        }
+                    }
+                }
+            case .failure(let error):
+                viewModel.errorMessage = error.localizedDescription
+                viewModel.showError = true
+            }
+        }
+        .sheet(isPresented: $showNewFolderDialog) {
+            if let directory = viewModel.currentDirectory {
+                NewFolderDialog(directory: directory, viewModel: viewModel)
+            }
+        }
         .overlay {
             if viewModel.volume == nil {
                 WelcomeView(showOpenPanel: $showOpenPanel, viewModel: viewModel)
+                    .allowsHitTesting(true)
             }
         }
+        .focusable(false)
     }
 }
 
@@ -129,6 +225,7 @@ struct WelcomeView: View {
     @Binding var showOpenPanel: Bool
     @State private var devicePath: String = "/dev/rdisk4"
     @State private var showDeviceInput = false
+    @State private var enableWriteMode = false
     @ObservedObject var viewModel: HFSViewModel
 
     var body: some View {
@@ -136,6 +233,7 @@ struct WelcomeView: View {
             Image(systemName: "internaldrive")
                 .font(.system(size: 64))
                 .foregroundStyle(.secondary)
+                .focusable(false)
 
             Text("HFS Viewer")
                 .font(.largeTitle)
@@ -144,18 +242,36 @@ struct WelcomeView: View {
 
             Text("Open a classic HFS volume to browse its contents")
                 .foregroundStyle(.secondary)
+                .focusable(false)
+
+            Toggle(isOn: $enableWriteMode) {
+                HStack(spacing: 6) {
+                    Text("Enable write operations")
+                    Text("BETA")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.orange, in: RoundedRectangle(cornerRadius: 4))
+                }
+            }
+            .help("Allow modifying files within the HFS volume (Beta - use with caution)")
+            .frame(maxWidth: 300)
 
             Button("Open File or Disk Image...") {
                 showOpenPanel = true
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
+            .focusable(false)
 
             Button("Open Device Path...") {
                 showDeviceInput.toggle()
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
+            .focusable(false)
 
             if showDeviceInput {
                 VStack(spacing: 12) {
@@ -165,7 +281,8 @@ struct WelcomeView: View {
 
                     Button("Open") {
                         let url = URL(fileURLWithPath: devicePath)
-                        viewModel.openVolume(at: url)
+                        let mode: HFSVolumeMode = enableWriteMode ? .readWrite : .readOnly
+                        viewModel.openVolumeWithMode(at: url, mode: mode)
                         showDeviceInput = false
                     }
                     .buttonStyle(.borderedProminent)
@@ -178,6 +295,7 @@ struct WelcomeView: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
+        .focusable(false)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.background)
     }
@@ -330,10 +448,51 @@ struct FileListView: View {
         }
         .navigationTitle(viewModel.currentDirectory?.name ?? "")
         .quickLookPreview($quickLookURL)
-        .focusable()
+        .focusable(viewModel.volume != nil)
         .focused($isFocused)
         .onAppear {
-            isFocused = true
+            if viewModel.volume != nil {
+                isFocused = true
+            }
+        }
+        .onChange(of: viewModel.volume == nil) { _, isNil in
+            isFocused = !isNil
+        }
+        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+            // Only allow drop if volume is writable
+            guard viewModel.volume?.isReadOnly == false,
+                  let directory = viewModel.currentDirectory else {
+                return false
+            }
+
+            // Extract URLs from providers
+            Task {
+                var urls: [URL] = []
+                for provider in providers {
+                    if let url = try? await provider.loadItem(forTypeIdentifier: "public.file-url") as? Data,
+                       let path = String(data: url, encoding: .utf8),
+                       let fileURL = URL(string: path) {
+                        urls.append(fileURL)
+                    }
+                }
+
+                if !urls.isEmpty {
+                    viewModel.checkWriteOperationSafety {
+                        Task {
+                            do {
+                                try await viewModel.importFiles(urls, to: directory)
+                            } catch {
+                                await MainActor.run {
+                                    viewModel.errorMessage = error.localizedDescription
+                                    viewModel.showError = true
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return true
         }
     }
 
@@ -380,6 +539,13 @@ struct FileListView: View {
             .width(100)
         }
         .tableStyle(.inset(alternatesRowBackgrounds: true))
+        .onTapGesture(count: 2) {
+            handleReturnPress()
+        }
+        .onKeyPress(.return) {
+            handleReturnPress()
+            return .handled
+        }
     }
 
     private var gridView: some View {
@@ -453,6 +619,24 @@ struct FileListView: View {
         pasteboard.clearContents()
         pasteboard.setString(fullPath, forType: .string)
     }
+
+    private func openFile(_ entry: HFSFileEntry) {
+        Task {
+            do {
+                let data = try entry.readData()
+                let tempURL = FileManager.default.temporaryDirectory
+                    .appendingPathComponent(entry.name)
+
+                try data.write(to: tempURL)
+
+                await MainActor.run {
+                    NSWorkspace.shared.open(tempURL)
+                }
+            } catch {
+                print("Failed to open file: \(error)")
+            }
+        }
+    }
 }
 
 // MARK: - Grid Item View
@@ -489,6 +673,33 @@ struct GridItemView: View {
         }
         .onTapGesture(count: 1) {
             viewModel.selectedEntry = entry
+        }
+        .onDrag {
+            // Export file for dragging out of HFS
+            // Note: Directories can't be easily dragged, so we only support files
+            guard !entry.isDirectory else {
+                return NSItemProvider()
+            }
+
+            let provider = NSItemProvider()
+
+            // Register the file data with a promise
+            provider.registerFileRepresentation(forTypeIdentifier: "public.data", fileOptions: [.openInPlace], visibility: .all) { completion in
+                Task {
+                    do {
+                        let data = try entry.readData()
+                        let tempURL = FileManager.default.temporaryDirectory
+                            .appendingPathComponent(entry.name)
+                        try data.write(to: tempURL)
+                        completion(tempURL, true, nil)
+                    } catch {
+                        completion(nil, false, error)
+                    }
+                }
+                return nil
+            }
+
+            return provider
         }
         .contextMenu {
             if entry.isDirectory {
@@ -586,6 +797,9 @@ struct FileRowView: View {
     let entry: HFSFileEntry
     @ObservedObject var viewModel: HFSViewModel
     @State private var showExportDialog = false
+    @State private var showRenameDialog = false
+    @State private var showDeleteConfirmation = false
+    @State private var showNewFolderDialog = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -600,18 +814,36 @@ struct FileRowView: View {
                     .foregroundStyle(.secondary)
                     .font(.caption)
             }
+
+            Spacer(minLength: 0)
         }
         .contentShape(Rectangle())
-        .onTapGesture(count: 2) {
-            if entry.isDirectory {
-                viewModel.navigateTo(entry)
-            } else {
-                // Double-click: open in default app
-                openInDefaultApp()
+        .onDrag {
+            // Export file for dragging out of HFS
+            // Note: Directories can't be easily dragged, so we only support files
+            guard !entry.isDirectory else {
+                return NSItemProvider()
             }
-        }
-        .onTapGesture(count: 1) {
-            viewModel.selectedEntry = entry
+
+            let provider = NSItemProvider()
+
+            // Register the file data with a promise
+            provider.registerFileRepresentation(forTypeIdentifier: "public.data", fileOptions: [.openInPlace], visibility: .all) { completion in
+                Task {
+                    do {
+                        let data = try entry.readData()
+                        let tempURL = FileManager.default.temporaryDirectory
+                            .appendingPathComponent(entry.name)
+                        try data.write(to: tempURL)
+                        completion(tempURL, true, nil)
+                    } catch {
+                        completion(nil, false, error)
+                    }
+                }
+                return nil
+            }
+
+            return provider
         }
         .contextMenu {
             if entry.isDirectory {
@@ -652,6 +884,42 @@ struct FileRowView: View {
                     showExportDialog = true
                 }
             }
+
+            // Write operations - only show if volume is writable
+            if viewModel.volume?.isReadOnly == false {
+                Divider()
+
+                Button("Rename...") {
+                    showRenameDialog = true
+                }
+
+                Button("Duplicate") {
+                    viewModel.checkWriteOperationSafety {
+                        Task {
+                            do {
+                                try await viewModel.duplicateEntry(entry)
+                            } catch {
+                                await MainActor.run {
+                                    viewModel.errorMessage = error.localizedDescription
+                                    viewModel.showError = true
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if entry.isDirectory {
+                    Button("New Folder...") {
+                        showNewFolderDialog = true
+                    }
+                }
+
+                Divider()
+
+                Button("Delete", role: .destructive) {
+                    showDeleteConfirmation = true
+                }
+            }
         }
         .fileExporter(
             isPresented: $showExportDialog,
@@ -662,6 +930,31 @@ struct FileRowView: View {
             if case .failure(let error) = result {
                 print("Export failed: \(error)")
             }
+        }
+        .sheet(isPresented: $showRenameDialog) {
+            RenameDialog(entry: entry, viewModel: viewModel)
+        }
+        .sheet(isPresented: $showNewFolderDialog) {
+            NewFolderDialog(directory: entry, viewModel: viewModel)
+        }
+        .alert("Delete \(entry.name)?", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                viewModel.checkWriteOperationSafety {
+                    Task {
+                        do {
+                            try await viewModel.deleteEntry(entry)
+                        } catch {
+                            await MainActor.run {
+                                viewModel.errorMessage = error.localizedDescription
+                                viewModel.showError = true
+                            }
+                        }
+                    }
+                }
+            }
+        } message: {
+            Text("This action cannot be undone.")
         }
     }
 
@@ -938,6 +1231,130 @@ struct InfoRow: View {
                 .textSelection(.enabled)
         }
         .font(.callout)
+    }
+}
+
+// MARK: - Rename Dialog
+
+struct RenameDialog: View {
+    let entry: HFSFileEntry
+    @ObservedObject var viewModel: HFSViewModel
+    @State private var newName: String
+    @Environment(\.dismiss) private var dismiss
+
+    init(entry: HFSFileEntry, viewModel: HFSViewModel) {
+        self.entry = entry
+        self.viewModel = viewModel
+        self._newName = State(initialValue: entry.name)
+    }
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Rename \"\(entry.name)\"")
+                .font(.headline)
+
+            TextField("New name", text: $newName)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit {
+                    renameEntry()
+                }
+
+            HStack {
+                Button("Cancel") {
+                    dismiss()
+                }
+                .keyboardShortcut(.escape)
+
+                Spacer()
+
+                Button("Rename") {
+                    renameEntry()
+                }
+                .keyboardShortcut(.return)
+                .disabled(newName.isEmpty || newName == entry.name)
+            }
+        }
+        .padding()
+        .frame(width: 350)
+    }
+
+    private func renameEntry() {
+        guard !newName.isEmpty, newName != entry.name else { return }
+
+        let name = newName
+        dismiss()
+
+        viewModel.checkWriteOperationSafety {
+            Task {
+                do {
+                    try await viewModel.renameEntry(entry, to: name)
+                } catch {
+                    await MainActor.run {
+                        viewModel.errorMessage = error.localizedDescription
+                        viewModel.showError = true
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - New Folder Dialog
+
+struct NewFolderDialog: View {
+    let directory: HFSFileEntry
+    @ObservedObject var viewModel: HFSViewModel
+    @State private var folderName: String = ""
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("New Folder")
+                .font(.headline)
+
+            TextField("Folder name", text: $folderName)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit {
+                    createFolder()
+                }
+
+            HStack {
+                Button("Cancel") {
+                    dismiss()
+                }
+                .keyboardShortcut(.escape)
+
+                Spacer()
+
+                Button("Create") {
+                    createFolder()
+                }
+                .keyboardShortcut(.return)
+                .disabled(folderName.isEmpty)
+            }
+        }
+        .padding()
+        .frame(width: 350)
+    }
+
+    private func createFolder() {
+        guard !folderName.isEmpty else { return }
+
+        let name = folderName
+        dismiss()
+
+        viewModel.checkWriteOperationSafety {
+            Task {
+                do {
+                    try await viewModel.createFolder(name: name, in: directory)
+                } catch {
+                    await MainActor.run {
+                        viewModel.errorMessage = error.localizedDescription
+                        viewModel.showError = true
+                    }
+                }
+            }
+        }
     }
 }
 

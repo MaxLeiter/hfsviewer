@@ -284,13 +284,14 @@
 					"@executable_path/../Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/libs";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				OTHER_CODE_SIGN_FLAGS = "--deep";
 				OTHER_LDFLAGS = (
 					"-lpthread",
 					"-lz",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.maxleiter.com-maxleiter-HFSViewer";
+				PRODUCT_BUNDLE_IDENTIFIER = com.maxleiter.HFSViewer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -327,13 +328,14 @@
 					"@executable_path/../Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/libs";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				OTHER_CODE_SIGN_FLAGS = "--deep";
 				OTHER_LDFLAGS = (
 					"-lpthread",
 					"-lz",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.maxleiter.com-maxleiter-HFSViewer";
+				PRODUCT_BUNDLE_IDENTIFIER = com.maxleiter.HFSViewer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
