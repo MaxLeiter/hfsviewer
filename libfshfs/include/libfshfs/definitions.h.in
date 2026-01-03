@@ -1,0 +1,81 @@
+/*
+ * Definitions for libfshfs
+ *
+ * Copyright (C) 2009-2025, Joachim Metz <joachim.metz@gmail.com>
+ *
+ * Refer to AUTHORS for acknowledgements.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+#if !defined( _LIBFSHFS_DEFINITIONS_H )
+#define _LIBFSHFS_DEFINITIONS_H
+
+#include <libfshfs/types.h>
+
+#define LIBFSHFS_VERSION			@VERSION@
+
+/* The version string
+ */
+#define LIBFSHFS_VERSION_STRING			"@VERSION@"
+
+/* The file access
+ * bit 1        set to 1 for read access
+ * bit 2        set to 1 for write access
+ * bit 3-8      not used
+ */
+enum LIBFSHFS_ACCESS_FLAGS
+{
+	LIBFSHFS_ACCESS_FLAG_READ		= 0x01,
+/* Reserved: not supported yet */
+	LIBFSHFS_ACCESS_FLAG_WRITE		= 0x02
+};
+
+/* The file access macros
+ */
+#define LIBFSHFS_OPEN_READ			( LIBFSHFS_ACCESS_FLAG_READ )
+/* Reserved: not supported yet */
+#define LIBFSHFS_OPEN_WRITE			( LIBFSHFS_ACCESS_FLAG_WRITE )
+/* Reserved: not supported yet */
+#define LIBFSHFS_OPEN_READ_WRITE		( LIBFSHFS_ACCESS_FLAG_READ | LIBFSHFS_ACCESS_FLAG_WRITE )
+
+/* The path segment separator
+ */
+#define LIBFSHFS_SEPARATOR			'/'
+
+/* The file system types
+ */
+enum LIBFSHFS_FILE_SYSTEM_TYPES
+{
+        LIBFSHFS_FILE_SYSTEM_TYPE_UNDEFINED,
+        LIBFSHFS_FILE_SYSTEM_TYPE_HFS,
+        LIBFSHFS_FILE_SYSTEM_TYPE_HFS_PLUS,
+        LIBFSHFS_FILE_SYSTEM_TYPE_HFSX
+};
+
+/* The file types
+ */
+enum LIBFSHFS_FILE_TYPES
+{
+	LIBFSHFS_FILE_TYPE_FIFO			= 0x1000,
+	LIBFSHFS_FILE_TYPE_CHARACTER_DEVICE	= 0x2000,
+	LIBFSHFS_FILE_TYPE_DIRECTORY		= 0x4000,
+	LIBFSHFS_FILE_TYPE_BLOCK_DEVICE		= 0x6000,
+	LIBFSHFS_FILE_TYPE_REGULAR_FILE		= 0x8000,
+	LIBFSHFS_FILE_TYPE_SYMBOLIC_LINK	= 0xa000,
+	LIBFSHFS_FILE_TYPE_SOCKET		= 0xc000
+};
+
+#endif /* !defined( _LIBFSHFS_DEFINITIONS_H ) */
+

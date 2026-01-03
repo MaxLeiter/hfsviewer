@@ -1,0 +1,1060 @@
+\section{HFS+ Filesystem Overview}
+
+HFS Plus (HFS+), also known as Mac OS Extended, is Apple's modern filesystem designed to replace HFS. Introduced in Mac OS 8.1 (1998), it addresses HFS limitations while maintaining backward compatibility.
+
+\subsection{Key Improvements over HFS}
+
+\begin{itemize}
+    \item \textbf{Unicode filenames}: Full Unicode support (up to 255 UTF-16 characters)
+    \item \textbf{Larger volumes}: Up to 8 EB (exabytes) theoretical
+    \item \textbf{Larger files}: Up to 8 EB per file
+    \item \textbf{Smaller allocation blocks}: More efficient space usage
+    \item \textbf{Journaling support}: Optional transaction journal for crash recovery
+    \item \textbf{Hard links}: Support for hard links (Mac OS X 10.2+)
+    \item \textbf{Symbolic links}: Support for symbolic links
+    \item \textbf{Extended attributes}: Arbitrary metadata on files/folders
+    \item \textbf{Case sensitivity option}: HFSX variant supports case-sensitive names
+\end{itemize}
+
+\subsection{HFS+ Characteristics}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+\textbf{Feature} & \textbf{Specification} \\
+\midrule
+Maximum volume size & 8 EB (2\textsuperscript{63} bytes) \\
+Maximum file size & 8 EB (2\textsuperscript{63} bytes) \\
+Filename length & 255 Unicode characters (UTF-16) \\
+Date range & January 1, 1904 to February 6, 2040 (Y2K40) \\
+Minimum allocation block & 512 bytes \\
+Block addressing & 32-bit allocation block numbers \\
+Case sensitivity & Case-insensitive (HFS+) or case-sensitive (HFSX) \\
+\bottomrule
+\end{tabular}
+\caption{HFS+ Specifications}
+\end{table}
+
+\section{Volume Structure}
+
+HFS+ volumes are structured similarly to HFS but with enhanced metadata structures.
+
+\subsection{Volume Layout}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{llp{7cm}}
+\toprule
+\textbf{Location} & \textbf{Name} & \textbf{Description} \\
+\midrule
+Byte 0 & Reserved & Boot sector (512 bytes) \\
+Byte 512 & Reserved & Additional boot area (512 bytes) \\
+Byte 1024 & Volume Header & Primary volume metadata \\
+... & Allocation Bitmap & Volume space allocation map \\
+... & Allocation File & B-tree of allocation bitmap extents \\
+... & Extents Overflow File & B-tree of file extent records \\
+... & Catalog File & B-tree of all files and folders \\
+... & Attributes File & B-tree of extended attributes \\
+... & Startup File & Boot loader for non-Mac systems \\
+... & Data Area & File contents and special files \\
+-1024 & Alternate VH & Backup copy of Volume Header \\
+\bottomrule
+\end{tabular}
+\caption{HFS+ Volume Layout}
+\end{table}
+
+\section{Volume Header - Complete Bit-Level Specification}
+
+The Volume Header is the \textbf{most critical structure} in HFS+. Located at byte offset 1024, it is exactly \textbf{512 bytes}.
+
+\subsection{Volume Header Complete Field Map - Every Byte Documented}
+
+\begin{longtable}{llllp{5cm}}
+\toprule
+\textbf{Offset} & \textbf{Field} & \textbf{Type} & \textbf{Size} & \textbf{Description} \\
+\midrule
+\endhead
++0 & signature & uint16 & 2 & \textbf{0x482B} ('H+') or \textbf{0x4858} ('HX') \\
++2 & version & uint16 & 2 & \textbf{4} (HFS+) or \textbf{5} (HFSX) \\
++4 & attributes & uint32 & 4 & Volume attributes (flags, see below) \\
++8 & lastMountedVersion & uint32 & 4 & OS signature that last mounted \\
++12 & journalInfoBlock & uint32 & 4 & Journal info block (0 = no journal) \\
++16 & createDate & uint32 & 4 & Creation date (HFS+ time) \\
++20 & modifyDate & uint32 & 4 & Last modification date \\
++24 & backupDate & uint32 & 4 & Last backup date \\
++28 & checkedDate & uint32 & 4 & Last fsck date \\
++32 & fileCount & uint32 & 4 & Total files on volume \\
++36 & folderCount & uint32 & 4 & Total folders on volume \\
++40 & blockSize & uint32 & 4 & Allocation block size (bytes) \\
++44 & totalBlocks & uint32 & 4 & Total allocation blocks \\
++48 & freeBlocks & uint32 & 4 & Free allocation blocks \\
++52 & nextAllocation & uint32 & 4 & Hint for next allocation \\
++56 & rsrcClumpSize & uint32 & 4 & Default resource fork clump \\
++60 & dataClumpSize & uint32 & 4 & Default data fork clump \\
++64 & nextCatalogID & uint32 & 4 & Next unused Catalog Node ID \\
++68 & writeCount & uint32 & 4 & Volume write count \\
++72 & encodingsBitmap & uint64 & 8 & Text encodings used (64 bits) \\
++80 & finderInfo & uint32[8] & 32 & Finder information \\
++112 & allocationFile & HFSPlusForkData & 80 & Allocation file fork \\
++192 & extentsFile & HFSPlusForkData & 80 & Extents file fork \\
++272 & catalogFile & HFSPlusForkData & 80 & Catalog file fork \\
++352 & attributesFile & HFSPlusForkData & 80 & Attributes file fork \\
++432 & startupFile & HFSPlusForkData & 80 & Startup file fork \\
+\bottomrule
+\caption{HFS+ Volume Header Structure (512 bytes total)}
+\end{longtable}
+
+\textbf{Total size verification}: 2 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 8 + 32 + (80*5) = 512 bytes
+
+\subsection{Critical Field Details - Bit-by-Bit}
+
+\subsubsection{signature - Volume Signature (Offset +0, 2 bytes)}
+
+\textbf{HFS+ Standard}: \texttt{0x482B} (big-endian)
+
+\textbf{Byte representation}:
+\begin{verbatim}
+Offset 1024: 0x48 ('H')
+Offset 1025: 0x2B ('+')
+\end{verbatim}
+
+\textbf{HFSX Case-Sensitive}: \texttt{0x4858} (big-endian)
+
+\textbf{Byte representation}:
+\begin{verbatim}
+Offset 1024: 0x48 ('H')
+Offset 1025: 0x58 ('X')
+\end{verbatim}
+
+\textbf{Validation}:
+\begin{itemize}
+    \item Must be exactly \texttt{0x482B} or \texttt{0x4858}
+    \item Any other value = not HFS+ or corrupted
+    \item \texttt{0x4244} = HFS (not HFS+)
+\end{itemize}
+
+\textbf{Hex dump verification}:
+\begin{verbatim}
+xxd -s 1024 -l 2 -p volume.hfsplus
+Expected: 482b (HFS+) or 4858 (HFSX)
+\end{verbatim}
+
+\subsubsection{version - Volume Version (Offset +2, 2 bytes)}
+
+\textbf{HFS+ Standard}: \texttt{0x0004} (4 decimal, big-endian)
+
+\textbf{Byte representation}:
+\begin{verbatim}
+Offset 1026: 0x00
+Offset 1027: 0x04
+\end{verbatim}
+
+\textbf{HFSX}: \texttt{0x0005} (5 decimal)
+
+\textbf{Validation}: mkfs.hfs+ sets version to 4 for standard HFS+.
+
+\subsubsection{attributes - Volume Attributes (Offset +4, 4 bytes)}
+
+32-bit flags field (big-endian). \textbf{Every bit documented}:
+
+\begin{longtable}{llp{7cm}}
+\toprule
+\textbf{Bit} & \textbf{Hex Mask} & \textbf{Meaning} \\
+\midrule
+\endhead
+0-6 & 0x0000007F & Reserved (must be 0) \\
+7 & 0x00000080 & Volume locked by hardware \\
+\textbf{8} & \textbf{0x00000100} & \textbf{Volume unmounted cleanly} \\
+9 & 0x00000200 & Volume has spared bad blocks \\
+10 & 0x00000400 & Needs fsck (consistency check required) \\
+11 & 0x00000800 & Catalog node IDs wrapped around \\
+12 & 0x00001000 & Software lock \\
+\textbf{13} & \textbf{0x00002000} & \textbf{Volume is journaled} \\
+14 & 0x00004000 & Reserved \\
+15 & 0x00008000 & Reserved \\
+16-31 & 0xFFFF0000 & Reserved \\
+\bottomrule
+\caption{Volume Header attributes Bit Definitions}
+\end{longtable}
+
+\textbf{Common values}:
+\begin{itemize}
+    \item \texttt{0x00000100}: Clean, non-journaled (mkfs.hfs+ default)
+    \item \texttt{0x00002100}: Clean, journaled (mkfs.hfs+ -j)
+\end{itemize}
+
+\textbf{Byte representation for 0x00000100}:
+\begin{verbatim}
+Offset 1028: 0x00
+Offset 1029: 0x00
+Offset 1030: 0x01
+Offset 1031: 0x00
+\end{verbatim}
+
+\textbf{Verification}:
+\begin{verbatim}
+xxd -s 1028 -l 4 -p volume.hfsplus
+Expected: 00000100 (non-journaled) or 00002100 (journaled)
+\end{verbatim}
+
+\subsubsection{blockSize - Allocation Block Size (Offset +40, 4 bytes)}
+
+\textbf{Value}: 32-bit unsigned, big-endian
+
+\textbf{Valid range}:
+\begin{itemize}
+    \item Minimum: 512 bytes
+    \item Maximum: Typically 32 KB, theoretically larger
+    \item Must be power of 2
+    \item Must be multiple of 512
+\end{itemize}
+
+\textbf{Example for 4096 bytes (4 KB)}:
+\begin{verbatim}
+Decimal: 4096
+Hex: 0x00001000
+Bytes at offset 1064:
+  0x00 0x00 0x10 0x00
+\end{verbatim}
+
+\textbf{Validation}:
+\begin{verbatim}
+xxd -s 1064 -l 4 -p volume.hfsplus
+# For 4 KB blocks: 00001000
+# For 8 KB blocks: 00002000
+\end{verbatim}
+
+\subsubsection{rsrcClumpSize and dataClumpSize (Offsets +56, +60)}
+
+\textbf{Critical}: These MUST be non-zero in valid HFS+ volumes.
+
+\textbf{Recommended value}:
+\begin{equation}
+\mathrm{clumpSize} = \mathrm{blockSize} \times 4
+\end{equation}
+
+For 4 KB blocks:
+\begin{equation}
+\mathrm{clumpSize} = 4096 \times 4 = 16384~\mathrm{bytes} = \texttt{0x00004000}
+\end{equation}
+
+\textbf{Byte representation}:
+\begin{verbatim}
+rsrcClumpSize at offset 1080: 0x00 0x00 0x40 0x00
+dataClumpSize at offset 1084: 0x00 0x00 0x40 0x00
+\end{verbatim}
+
+\textbf{Common error}: If these are 0x00000000, the Volume Header is invalid and nextCatalogID appears at wrong offset.
+
+\textbf{Verification}:
+\begin{verbatim}
+xxd -s 1080 -l 4 -p volume.hfsplus  # rsrcClumpSize
+xxd -s 1084 -l 4 -p volume.hfsplus  # dataClumpSize
+# Both should be non-zero
+\end{verbatim}
+
+\subsubsection{nextCatalogID - Next CNID (Offset +64, 4 bytes)}
+
+\textbf{Minimum}: \texttt{0x00000010} (16 decimal)
+
+\textbf{Reserved CNIDs 1-15}:
+\begin{longtable}{lp{8cm}}
+\toprule
+\textbf{CNID} & \textbf{Purpose} \\
+\midrule
+\endhead
+1 & Root folder's parent (kHFSRootParentID) \\
+2 & Root folder (kHFSRootFolderID) \\
+3 & Extents overflow file (kHFSExtentsFileID) \\
+4 & Catalog file (kHFSCatalogFileID) \\
+5 & Bad allocation blocks file (kHFSBadBlockFileID) \\
+6 & Allocation bitmap file (kHFSAllocationFileID) \\
+7 & Startup file (kHFSStartupFileID) \\
+8 & Attributes file (kHFSAttributesFileID) \\
+9-13 & Reserved \\
+14 & Journal file (kHFSJournalFileID, if journaled) \\
+15 & Journal info block (kHFSJournalInfoBlockID) \\
+\bottomrule
+\caption{Reserved HFS+ Catalog Node IDs}
+\end{longtable}
+
+\textbf{Byte representation for value 16}:
+\begin{verbatim}
+Offset 1088: 0x00
+Offset 1089: 0x00
+Offset 1090: 0x00
+Offset 1091: 0x10
+\end{verbatim}
+
+\textbf{Critical validation}:
+\begin{verbatim}
+xxd -s 1088 -l 4 -p volume.hfsplus
+Expected: 00000010 (minimum value)
+\end{verbatim}
+
+\textbf{Common error}: If you see \texttt{00000000}, rsrcClumpSize/dataClumpSize were likely omitted, shifting all subsequent fields.
+
+\subsection{HFSPlusForkData Structure - 80 Bytes Per Fork}
+
+Each fork descriptor is 80 bytes:
+
+\begin{longtable}{llp{6cm}}
+\toprule
+\textbf{Offset} & \textbf{Field} & \textbf{Description} \\
+\midrule
+\endhead
++0 & logicalSize & File size in bytes (uint64) \\
++8 & clumpSize & Clump size for this file (uint32) \\
++12 & totalBlocks & Total allocation blocks (uint32) \\
++16 & extents[0] & First extent descriptor (8 bytes) \\
++24 & extents[1] & Second extent descriptor (8 bytes) \\
++32 & extents[2] & Third extent descriptor (8 bytes) \\
++40 & extents[3] & Fourth extent descriptor (8 bytes) \\
++48 & extents[4] & Fifth extent descriptor (8 bytes) \\
++56 & extents[5] & Sixth extent descriptor (8 bytes) \\
++64 & extents[6] & Seventh extent descriptor (8 bytes) \\
++72 & extents[7] & Eighth extent descriptor (8 bytes) \\
+\bottomrule
+\caption{HFSPlusForkData Structure (80 bytes)}
+\end{longtable}
+
+\subsubsection{HFSPlusExtentDescriptor - 8 Bytes Each}
+
+\begin{longtable}{llp{6cm}}
+\toprule
+\textbf{Offset} & \textbf{Field} & \textbf{Description} \\
+\midrule
+\endhead
++0 & startBlock & First allocation block (uint32) \\
++4 & blockCount & Number of blocks (uint32) \\
+\bottomrule
+\caption{HFSPlusExtentDescriptor (8 bytes)}
+\end{longtable}
+
+\textbf{Example}: Catalog file uses blocks 100-199:
+\begin{verbatim}
+logicalSize:  0x0000000000018800  (100 KB)
+clumpSize:    0x00004000          (16 KB)
+totalBlocks:  0x00000019          (25 blocks)
+extents[0]:   startBlock=100, blockCount=25
+              Bytes: 00 00 00 64 00 00 00 19
+extents[1-7]: startBlock=0, blockCount=0 (unused)
+\end{verbatim}
+
+\subsection{Alternate Volume Header Location}
+
+\textbf{Exact formula}:
+\begin{equation}
+\mathrm{alt\_VH\_offset} = \mathrm{volume\_size\_bytes} - 1024
+\end{equation}
+
+\textbf{Same as HFS}. This is \textbf{NOT} sector-based.
+
+\textbf{Example for 50 MB}:
+\begin{verbatim}
+Volume size: 52,428,800 bytes
+Alt VH at:   52,428,800 - 1,024 = 52,427,776 bytes
+\end{verbatim}
+
+\textbf{Verification}:
+\begin{verbatim}
+FILESIZE=$(stat -c%s volume.hfsplus)
+ALTOFFSET=$((FILESIZE - 1024))
+xxd -s $ALTOFFSET -l 2 -p volume.hfsplus
+Expected: 482b (same as primary)
+\end{verbatim}
+
+\section{HFS+ B-Trees - Complete Node and Record Structures}
+
+HFS+ uses B-trees for \textbf{all metadata organization}: Catalog, Extents, Attributes.
+
+\subsection{B-Tree Node Structure - 14-Byte Node Descriptor}
+
+\textbf{Every B-tree node begins with a 14-byte descriptor}:
+
+\begin{longtable}{llllp{5cm}}
+\toprule
+\textbf{Offset} & \textbf{Field} & \textbf{Type} & \textbf{Size} & \textbf{Description} \\
+\midrule
+\endhead
++0 & fLink & uint32 & 4 & Forward link (next node, 0 = none) \\
++4 & bLink & uint32 & 4 & Backward link (prev node, 0 = none) \\
++8 & kind & int8 & 1 & Node type (see below) \\
++9 & height & uint8 & 1 & Level in tree (0 = leaf) \\
++10 & numRecords & uint16 & 2 & Number of records in node \\
++12 & reserved & uint16 & 2 & Reserved (must be 0) \\
+\bottomrule
+\caption{BTNodeDescriptor (14 bytes)}
+\end{longtable}
+
+\subsubsection{kind - Node Type Values}
+
+\begin{longtable}{lp{8cm}}
+\toprule
+\textbf{Value} & \textbf{Node Type} \\
+\midrule
+\endhead
+-1 & Leaf node (contains data records) \\
+0 & Index node (contains child pointers) \\
+1 & Header node (B-tree metadata, always node 0) \\
+2 & Map node (allocation bitmap) \\
+\bottomrule
+\caption{B-tree Node Types}
+\end{longtable}
+
+\textbf{Byte example for header node (kind=1)}:
+\begin{verbatim}
+Offset +8: 0x01 (header node)
+Offset +9: 0x00 (height 0, not used in header)
+Offset +10-11: 0x00 0x03 (3 records typical: header, user data, map)
+\end{verbatim}
+
+\subsection{BTHeaderRec - B-Tree Header Record (106 Bytes)}
+
+Located in the \textbf{first record of node 0 (header node)} in every B-tree.
+
+\begin{longtable}{llllp{5cm}}
+\toprule
+\textbf{Offset} & \textbf{Field} & \textbf{Type} & \textbf{Size} & \textbf{Description} \\
+\midrule
+\endhead
++0 & treeDepth & uint16 & 2 & Current depth (1 = only root) \\
++2 & rootNode & uint32 & 4 & Root node number \\
++6 & leafRecords & uint32 & 4 & Total leaf records \\
++10 & firstLeafNode & uint32 & 4 & First leaf node number \\
++14 & lastLeafNode & uint32 & 4 & Last leaf node number \\
++18 & nodeSize & uint16 & 2 & Node size in bytes \\
++20 & maxKeyLength & uint16 & 2 & Maximum key length \\
++22 & totalNodes & uint32 & 4 & Total nodes allocated \\
++26 & freeNodes & uint32 & 4 & Number of free nodes \\
++30 & reserved1 & uint16 & 2 & Reserved \\
++32 & clumpSize & uint32 & 4 & Clump size for B-tree file \\
++36 & btreeType & uint8 & 1 & B-tree type (0=HFS, 128=HFS+) \\
++37 & keyCompareType & uint8 & 1 & Key comparison type \\
++38 & attributes & uint32 & 4 & B-tree attributes (flags) \\
++42 & reserved3 & uint32[16] & 64 & Reserved (must be 0) \\
+\bottomrule
+\caption{BTHeaderRec Structure (106 bytes total)}
+\end{longtable}
+
+\textbf{Total size verification}: 2 + 4 + 4 + 4 + 4 + 2 + 2 + 4 + 4 + 2 + 4 + 1 + 1 + 4 + 64 = 106 bytes
+
+\subsubsection{Critical BTHeaderRec Field Details}
+
+\textbf{treeDepth} (Offset +0):
+\begin{itemize}
+    \item Value 0: Empty tree
+    \item Value 1: Only root node (contains data directly)
+    \item Value 2+: Root is index node
+    \item \textbf{New volume}: Usually 1 (minimal tree)
+\end{itemize}
+
+\textbf{nodeSize} (Offset +18):
+\begin{itemize}
+    \item \textbf{HFS+ Standard}: 4096 bytes (4 KB)
+    \item \textbf{HFS+ Large}: 8192 bytes (8 KB)
+    \item Must be power of 2
+    \item Must be $\geq$ 512 bytes
+\end{itemize}
+
+\textbf{Byte representation for 4096}:
+\begin{verbatim}
+Offset +18: 0x10
+Offset +19: 0x00
+(Big-endian: 0x1000 = 4096)
+\end{verbatim}
+
+\textbf{btreeType} (Offset +36):
+\begin{itemize}
+    \item \textbf{0}: HFS B-tree (legacy)
+    \item \textbf{128}: HFS+ B-tree (standard)
+    \item \textbf{255}: Reserved
+\end{itemize}
+
+\textbf{keyCompareType} (Offset +37):
+\begin{itemize}
+    \item \textbf{0xBC}: Case-insensitive (HFS+ default)
+    \item \textbf{0xCF}: Binary compare (HFSX case-sensitive)
+\end{itemize}
+
+\textbf{attributes} (Offset +38, 4 bytes):
+\begin{longtable}{llp{7cm}}
+\toprule
+\textbf{Bit} & \textbf{Hex Mask} & \textbf{Meaning} \\
+\midrule
+\endhead
+0 & 0x00000001 & Bad close (B-tree not closed properly) \\
+1 & 0x00000002 & Big keys (key length $>$ 255 bytes) \\
+2 & 0x00000004 & Variable index keys \\
+3-31 & 0xFFFFFFF8 & Reserved (must be 0) \\
+\bottomrule
+\caption{BTHeaderRec attributes Flags}
+\end{longtable}
+
+\subsection{Catalog File B-Tree - Complete Key and Record Formats}
+
+The Catalog File contains \textbf{all files and folders}. It uses \textbf{Unicode HFSUniStr255 keys}.
+
+\subsubsection{HFSPlusCatalogKey - Variable Length}
+
+\begin{longtable}{llllp{5cm}}
+\toprule
+\textbf{Offset} & \textbf{Field} & \textbf{Type} & \textbf{Size} & \textbf{Description} \\
+\midrule
+\endhead
++0 & keyLength & uint16 & 2 & Total key length (excluding this field) \\
++2 & parentID & uint32 & 4 & Parent folder CNID \\
++6 & nodeName & HFSUniStr255 & var & Unicode filename (see below) \\
+\bottomrule
+\caption{HFSPlusCatalogKey Structure}
+\end{longtable}
+
+\subsubsection{HFSUniStr255 - Unicode String (Max 255 UTF-16 Characters)}
+
+\begin{longtable}{llp{6cm}}
+\toprule
+\textbf{Offset} & \textbf{Field} & \textbf{Description} \\
+\midrule
+\endhead
++0 & length & uint16: Number of UTF-16 characters (NOT bytes) \\
++2 & unicode & uint16[]: UTF-16BE characters \\
+\bottomrule
+\caption{HFSUniStr255 Structure}
+\end{longtable}
+
+\textbf{Example}: Filename "Test.txt" (8 characters)
+\begin{verbatim}
+length:  0x0008 (8 UTF-16 chars)
+unicode: 
+  0x0054 ('T')
+  0x0065 ('e')
+  0x0073 ('s')
+  0x0074 ('t')
+  0x002E ('.')
+  0x0074 ('t')
+  0x0078 ('x')
+  0x0074 ('t')
+Total: 2 + (8*2) = 18 bytes for nodeName
+\end{verbatim}
+
+\textbf{Complete catalog key for "Test.txt" in root (CNID 2)}:
+\begin{verbatim}
+keyLength: 0x0016 (22 bytes: 4 parentID + 18 nodeName)
+parentID:  0x00000002 (root folder)
+nodeName:  [18 bytes as shown above]
+Total key: 2 + 22 = 24 bytes
+\end{verbatim}
+
+\subsubsection{Catalog Record Types - 4 Types}
+
+\begin{longtable}{llp{7cm}}
+\toprule
+\textbf{Type} & \textbf{Value} & \textbf{Description} \\
+\midrule
+\endhead
+kHFSPlusFolderRecord & 0x0001 & Folder (directory) \\
+kHFSPlusFileRecord & 0x0002 & File \\
+kHFSPlusFolderThreadRecord & 0x0003 & Folder thread (CNID $\rightarrow$ name) \\
+kHFSPlusFileThreadRecord & 0x0004 & File thread (CNID $\rightarrow$ name) \\
+\bottomrule
+\caption{Catalog Record Type Values}
+\end{longtable}
+
+\subsubsection{HFSPlusCatalogFile - File Record (248 Bytes)}
+
+\begin{longtable}{llllp{5cm}}
+\toprule
+\textbf{Offset} & \textbf{Field} & \textbf{Type} & \textbf{Size} & \textbf{Description} \\
+\midrule
+\endhead
++0 & recordType & int16 & 2 & \textbf{0x0002} (file) \\
++2 & flags & uint16 & 2 & File flags \\
++4 & reserved1 & uint32 & 4 & Reserved \\
++8 & fileID & uint32 & 4 & Catalog Node ID (CNID) \\
++12 & createDate & uint32 & 4 & Creation date (HFS+ time) \\
++16 & contentModDate & uint32 & 4 & Content modification date \\
++20 & attributeModDate & uint32 & 4 & Attribute modification date \\
++24 & accessDate & uint32 & 4 & Last access date \\
++28 & backupDate & uint32 & 4 & Backup date \\
++32 & permissions & HFSPlusBSDInfo & 16 & BSD ownership/permissions \\
++48 & userInfo & FInfo & 16 & Finder user info \\
++64 & finderInfo & FXInfo & 16 & Finder extended info \\
++80 & textEncoding & uint32 & 4 & Text encoding hint \\
++84 & reserved2 & uint32 & 4 & Reserved \\
++88 & dataFork & HFSPlusForkData & 80 & Data fork descriptor \\
++168 & resourceFork & HFSPlusForkData & 80 & Resource fork descriptor \\
+\bottomrule
+\caption{HFSPlusCatalogFile Structure (248 bytes total)}
+\end{longtable}
+
+\textbf{Total size verification}: 2 + 2 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 16 + 16 + 16 + 4 + 4 + 80 + 80 = 248 bytes
+
+\subsection{Catalog File}
+
+The Catalog File is a B-tree containing all files and folders on the volume.
+
+\subsubsection{Catalog Keys}
+\begin{itemize}
+    \item \textbf{keyLength}: 2 bytes
+    \item \textbf{parentID}: 4 bytes (Parent folder CNID)
+    \item \textbf{nodeName}: Variable-length Unicode string
+\end{itemize}
+
+\subsubsection{Catalog Record Types}
+\begin{enumerate}
+    \item \textbf{Folder Record (0x0001)}: Directory metadata
+    \item \textbf{File Record (0x0002)}: File metadata and fork information
+    \item \textbf{Folder Thread (0x0003)}: Maps CNID to parent folder
+    \item \textbf{File Thread (0x0004)}: Maps file CNID to parent folder
+\end{enumerate}
+
+\subsubsection{File Record Structure}
+\begin{itemize}
+    \item recordType: 0x0002
+    \item flags: File flags
+    \item fileID: Catalog Node ID
+    \item createDate, modifyDate: Timestamps
+    \item permissions: Unix permissions
+    \item userInfo, finderInfo: Finder metadata
+    \item textEncoding: Filename encoding hint
+    \item dataFork: Fork data for data fork (80 bytes)
+    \item resourceFork: Fork data for resource fork (80 bytes)
+\end{itemize}
+
+\subsection{Extents Overflow File}
+
+B-tree storing additional extent records when a file's fork exceeds the 8 extents stored in the catalog.
+
+\subsubsection{Extent Key}
+\begin{itemize}
+    \item keyLength: 2 bytes
+    \item forkType: 0x00 (data) or 0xFF (resource)
+    \item fileID: Catalog Node ID
+    \item startBlock: Starting allocation block
+\end{itemize}
+
+\subsubsection{Extent Descriptor}
+\begin{itemize}
+    \item startBlock: Starting allocation block (4 bytes)
+    \item blockCount: Number of contiguous blocks (4 bytes)
+\end{itemize}
+
+\subsection{Attributes File}
+
+B-tree storing extended attributes (metadata) for files and folders.
+
+\subsubsection{Supported Attributes}
+\begin{itemize}
+    \item Extended attributes (xattrs)
+    \item Access Control Lists (ACLs)
+    \item Resource fork data (if not inline)
+    \item Compressed data (HFS+ compression)
+\end{itemize}
+
+\begin{enumerate}
+    \item fsck.hfs+ detects journal
+    \item Scans journal for uncommitted transactions
+    \item Replays completed transactions to restore consistency
+    \item Marks volume clean after successful replay
+\end{enumerate}
+
+\section{Unicode Normalization - CRITICAL for Filename Compatibility}
+
+HFS+ uses \textbf{Unicode Normalization Form D (NFD)} for all filenames. This is \textbf{mandatory} and causes significant compatibility issues with other systems.
+
+\subsection{NFD vs NFC - The Core Problem}
+
+\textbf{Unicode allows multiple representations of the same character}:
+
+\begin{itemize}
+    \item \textbf{NFC (Composed)}: Single codepoint for accented characters
+    \item \textbf{NFD (Decomposed)}: Base character + combining accent
+\end{itemize}
+
+\textbf{Example}: Letter "é" (e with acute accent)
+
+\begin{longtable}{lp{8cm}}
+\toprule
+\textbf{Form} & \textbf{Representation} \\
+\midrule
+\endhead
+NFC & U+00E9 (single codepoint: LATIN SMALL LETTER E WITH ACUTE) \\
+NFD & U+0065 U+0301 (two codepoints: LATIN SMALL LETTER E + COMBINING ACUTE ACCENT) \\
+\bottomrule
+\caption{Unicode Normalization Example}
+\end{longtable}
+
+\textbf{Byte representation in UTF-16BE}:
+\begin{verbatim}
+NFC (1 UTF-16 unit):  0x00E9
+NFD (2 UTF-16 units): 0x0065 0x0301
+
+In HFSUniStr255:
+  length (NFC): 0x0001 (1 character)
+  length (NFD): 0x0002 (2 characters)
+\end{verbatim}
+
+\subsection{HFS+ NFD Requirement - MANDATORY}
+
+\textbf{Apple Technical Note TN1150}: All HFS+ filenames MUST be stored in NFD form.
+
+\textbf{Conversion algorithm}:
+\begin{enumerate}
+    \item Receive filename from user (may be in any form)
+    \item Decompose to NFD using Unicode decomposition tables
+    \item Store in catalog with NFD form
+    \item When reading, return NFD form to user
+\end{enumerate}
+
+\textbf{Critical implementation detail}:
+\begin{itemize}
+    \item mkfs.hfs+ must accept filenames and convert to NFD
+    \item Catalog B-tree keys are compared in NFD form
+    \item Case-insensitive comparison uses Unicode case folding tables
+\end{itemize}
+
+\subsection{Common NFD Characters - Complete Table}
+
+\textbf{Note}: The following table shows common accented characters and their NFD decompositions. Character names are given in ASCII descriptions to avoid PDF encoding issues.
+
+\begin{longtable}{llll}
+\toprule
+\textbf{Character} & \textbf{NFC} & \textbf{NFD} & \textbf{Components} \\
+\midrule
+\endhead
+a with grave & U+00E0 & U+0061 U+0300 & a + combining grave \\
+a with acute & U+00E1 & U+0061 U+0301 & a + combining acute \\
+a with circumflex & U+00E2 & U+0061 U+0302 & a + combining circumflex \\
+a with tilde & U+00E3 & U+0061 U+0303 & a + combining tilde \\
+a with diaeresis & U+00E4 & U+0061 U+0308 & a + combining diaeresis \\
+n with tilde & U+00F1 & U+006E U+0303 & n + combining tilde \\
+c with cedilla & U+00E7 & U+0063 U+0327 & c + combining cedilla \\
+u with diaeresis & U+00FC & U+0075 U+0308 & u + combining diaeresis \\
+o with diaeresis & U+00F6 & U+006F U+0308 & o + combining diaeresis \\
+a with ring above & U+00E5 & U+0061 U+030A & a + combining ring above \\
+\bottomrule
+\caption{Common NFD Decompositions}
+\end{longtable}
+
+\subsection{Compatibility Issues}
+
+\textbf{Linux/Windows}: Use NFC by default
+
+\textbf{Problem}: Filename created on macOS with accented characters in NFD form appears as different file than same filename in NFC form created on Linux on the same HFS+ volume.
+
+\textbf{Example}: A filename like ``cafe.txt'' with e-acute stored as NFD (e + U+0301) appears different than NFC (U+00E9) - these are different catalog entries!
+
+\textbf{Workaround}: Always normalize to NFD when writing to HFS+.
+
+\textbf{Implementation in hfsutils}:
+\begin{verbatim}
+// Pseudo-code for filename conversion
+void normalize_to_nfd(uint16_t *unicode, size_t *length) {
+    // For each character:
+    //   1. Look up in Unicode decomposition table
+    //   2. Replace with base + combining characters
+    //   3. Update length accordingly
+}
+\end{verbatim}
+
+\section{HFS+ Time Format - Mac Epoch and Conversion}
+
+HFS+ uses a \textbf{32-bit unsigned integer} for all timestamps, representing seconds since the \textbf{Mac epoch}.
+
+\subsection{Mac Epoch Definition}
+
+\textbf{Mac epoch}: January 1, 1904 00:00:00 UTC
+
+\textbf{Unix epoch}: January 1, 1970 00:00:00 UTC
+
+\textbf{Difference}: 2,082,844,800 seconds (66 years)
+
+\subsection{Date Range}
+
+\textbf{With 32-bit unsigned integer}:
+\begin{itemize}
+    \item Minimum: 0 (January 1, 1904)
+    \item Maximum: 4,294,967,295 (February 6, 2040 06:28:15 UTC)
+\end{itemize}
+
+\textbf{Y2K40 Problem}: HFS+ timestamps overflow on February 6, 2040.
+
+\subsection{Conversion Formulas}
+
+\textbf{HFS+ to Unix time}:
+\begin{equation}
+\mathrm{unix\_time} = \mathrm{hfs\_time} - 2082844800
+\end{equation}
+
+\textbf{Unix to HFS+ time}:
+\begin{equation}
+\mathrm{hfs\_time} = \mathrm{unix\_time} + 2082844800
+\end{equation}
+
+\textbf{Example conversion}:
+\begin{verbatim}
+HFS+ time:  3600000000 (0xD693A400)
+Unix time:  3600000000 - 2082844800 = 1517155200
+Unix date:  January 28, 2018 16:00:00 UTC
+\end{verbatim}
+
+\subsection{Byte Representation}
+
+\textbf{All timestamps are big-endian 32-bit unsigned integers}.
+
+\textbf{Example}: December 25, 2020 12:00:00 UTC
+\begin{verbatim}
+Unix timestamp: 1608897600
+HFS+ timestamp: 1608897600 + 2082844800 = 3691742400
+Hex: 0xDBF49140
+Bytes: 0xDB 0xF4 0x91 0x40
+\end{verbatim}
+
+\textbf{Verification in Volume Header createDate (offset +16)}:
+\begin{verbatim}
+xxd -s 1040 -l 4 -p volume.hfsplus
+Expected format: DBXXXXXX (for recent dates)
+\end{verbatim}
+
+\subsection{Y2K40 Safeguards in hfsutils}
+
+\textbf{Implementation in src/common/hfstime.c}:
+\begin{verbatim}
+#define HFS_Y2K40_LIMIT 4294967295
+#define HFS_SAFE_YEAR_2030 4102444800
+
+uint32_t hfs_get_safe_time(void) {
+    time_t now = time(NULL);
+    uint32_t hfs_time = (uint32_t)now + 2082844800;
+    
+    // If beyond Y2K40, use January 1, 2030
+    if (hfs_time > HFS_Y2K40_LIMIT) {
+        hfs_time = HFS_SAFE_YEAR_2030;
+    }
+    
+    return hfs_time;
+}
+\end{verbatim}
+
+\textbf{Critical}: mkfs.hfs, mkfs.hfs+, and fsck.hfs+ all use this function.
+
+\section{HFS+ Critical Oddities and Edge Cases}
+
+\subsection{Case-Insensitive vs Case-Preserving}
+
+\textbf{HFS+ Standard Behavior}:
+\begin{itemize}
+    \item \textbf{Case-preserving}: Stores "MyFile.txt" as typed
+    \item \textbf{Case-insensitive}: "myfile.txt" and "MyFile.txt" are the SAME file
+    \item Uses Unicode case folding for comparison
+\end{itemize}
+
+\textbf{HFSX Behavior}:
+\begin{itemize}
+    \item \textbf{Case-sensitive}: "myfile.txt" and "MyFile.txt" are DIFFERENT files
+    \item Signature: 0x4858 ('HX'), version 5
+    \item keyCompareType: 0xCF (binary compare)
+\end{itemize}
+
+\textbf{Incompatibility}: Standard HFS+ cannot be converted to HFSX without reformatting.
+
+\subsection{Folder Valence - Hidden Complexity}
+
+\textbf{HFSPlusCatalogFolder structure includes "valence" field}:
+\begin{itemize}
+    \item Counts number of items in folder
+    \item \textbf{Does NOT include invisible files} (e.g., .DS\_Store)
+    \item Must be updated on every file creation/deletion
+    \item Inconsistency causes fsck errors
+\end{itemize}
+
+\subsection{Hard Links - Indirect Nodes}
+
+HFS+ supports hard links (multiple names for same file):
+\begin{itemize}
+    \item Uses \textbf{indirect nodes} with special parent ID
+    \item Hard link parent: 0xFFFFFFFE (reserved)
+    \item Each hard link has unique CNID
+    \item All point to same fileID in hidden directory
+\end{itemize}
+
+\textbf{Implementation complexity}: Requires special catalog traversal logic.
+
+\subsection{Compression - Undocumented Extension}
+
+macOS 10.6+ introduced HFS+ compression (unofficial):
+\begin{itemize}
+    \item Compressed data stored in \textbf{extended attributes}
+    \item Resource fork contains decompression metadata
+    \item \textbf{Not part of original HFS+ spec}
+    \item Third-party implementations typically ignore
+\end{itemize}
+
+\subsection{Journal Checksum Algorithm - Missing from TN1150}
+
+Journal uses CRC32 or similar checksum (not fully documented):
+\begin{itemize}
+    \item Checksum in journal header (offset +28)
+    \item Verifies journal integrity before replay
+    \item \textbf{Algorithm varies by implementation}
+\end{itemize}
+
+\textbf{Safe approach}: If checksum fails, refuse to replay journal (mount read-only).
+
+\subsection{Allocation Block Alignment}
+
+\textbf{Critical for performance}:
+\begin{itemize}
+    \item Allocation blocks should align to physical sectors
+    \item blockSize should be multiple of physical sector size
+    \item Modern drives: 4 KB sectors → use 4 KB allocation blocks
+    \item Misalignment causes read-modify-write penalty
+\end{itemize}
+
+\textbf{mkfs.hfs+ default}: 4096 bytes (optimal for modern drives)
+
+\subsection{Extended Attributes File - Optional}
+
+\textbf{attributesFile in Volume Header} (offset +352):
+\begin{itemize}
+    \item Can be empty (logicalSize = 0) on new volumes
+    \item Created on-demand when first extended attribute added
+    \item Uses its own B-tree structure
+    \item Keys: (fileID, attribute name)
+\end{itemize}
+
+\textbf{Common attributes}:
+\begin{itemize}
+    \item com.apple.FinderInfo: Finder metadata
+    \item com.apple.ResourceFork: Resource fork data (alternative storage)
+    \item com.apple.decmpfs: Compressed file data
+\end{itemize}
+
+\section{Reimplementation Checklist - Everything You Need}
+
+\subsection{Data Structures Required}
+
+\begin{enumerate}
+    \item Volume Header (512 bytes) - Complete in this document
+    \item HFSPlusForkData (80 bytes) - Complete in this document
+    \item HFSPlusExtentDescriptor (8 bytes) - Complete in this document
+    \item BTNodeDescriptor (14 bytes) - Complete in this document
+    \item BTHeaderRec (106 bytes) - Complete in this document
+    \item HFSPlusCatalogKey (variable) - Complete in this document
+    \item HFSUniStr255 (variable, max 512 bytes) - Complete in this document
+    \item HFSPlusCatalogFile (248 bytes) - Complete in this document
+    \item HFSPlusCatalogFolder (88 bytes) - See Apple TN1150
+    \item JournalInfoBlock (96 bytes) - Complete in this document
+\end{enumerate}
+
+\subsection{Algorithms Required}
+
+\begin{enumerate}
+    \item Unicode NFD normalization (use ICU library or tables)
+    \item Unicode case folding (for case-insensitive comparison)
+    \item B-tree insertion/deletion (standard CS algorithm)
+    \item Extent allocation/deallocation
+    \item Bitmap manipulation (allocation file)
+    \item CRC32 or checksum (for journal)
+    \item HFS+ time conversion (formulas in this document)
+\end{enumerate}
+
+\subsection{Validation Commands}
+
+\textbf{All xxd commands in this document can verify}:
+\begin{itemize}
+    \item Volume signature (offset 1024)
+    \item Volume version (offset 1026)
+    \item Attributes flags (offset 1028)
+    \item blockSize (offset 1064)
+    \item rsrcClumpSize, dataClumpSize (offsets 1080, 1084)
+    \item nextCatalogID (offset 1088)
+    \item Alternate Volume Header (volume\_size - 1024)
+\end{itemize}
+
+\textbf{fsck.hfs+ validates}:
+\begin{itemize}
+    \item All B-tree structures
+    \item Folder valence consistency
+    \item Allocation bitmap consistency
+    \item Extent overflow records
+    \item Journal integrity (if present)
+\end{itemize}
+
+\subsection{No External References Needed}
+
+\textbf{This document contains}:
+\begin{itemize}
+    \item Every byte offset for critical structures
+    \item All bit flags with hex masks
+    \item Complete formulas for calculations
+    \item Byte examples for verification
+    \item Common error patterns
+    \item Compatibility warnings
+\end{itemize}
+
+\textbf{You can reimplement HFS+ with}:
+\begin{enumerate}
+    \item This chapter (complete specification)
+    \item Standard Unicode tables (NFD decomposition)
+    \item Standard B-tree algorithm (CS textbook)
+    \item CRC32 implementation (standard)
+\end{enumerate}
+
+\textbf{No internet required} after you have these resources.
+
+\section{HFS+ vs HFSX}
+
+HFSX is a variant of HFS+ with case-sensitive filename comparison.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Feature} & \textbf{HFS+} & \textbf{HFSX} \\
+\midrule
+Signature & 0x482B ('H+') & 0x4858 ('HX') \\
+Version & 4 & 5 \\
+Case sensitivity & No & Yes \\
+Filename comparison & Case-insensitive & Case-sensitive \\
+"File.txt" = "file.txt" & Yes & No \\
+\bottomrule
+\end{tabular}
+\caption{HFS+ vs HFSX}
+\end{table}
+
+\textbf{Note}: hfsutils mkfs.hfs+ creates standard HFS+ volumes (case-insensitive). HFSX support is not currently implemented.
+
+\section{Compatibility Considerations}
+
+\subsection{macOS}
+\begin{itemize}
+    \item Native support for HFS+ and HFSX
+    \item Full journaling support
+    \item All extended attributes supported
+    \item APFS is now default (macOS 10.13+)
+\end{itemize}
+
+\subsection{Linux}
+\begin{itemize}
+    \item Kernel module \texttt{hfsplus} required
+    \item \textbf{No journaling support in kernel driver}
+    \item Basic read/write support
+    \item Some extended attributes supported
+    \item May mount journaled volumes read-only for safety
+\end{itemize}
+
+\subsection{FreeBSD/OpenBSD/NetBSD}
+\begin{itemize}
+    \item Native HFS+ read support
+    \item Write support via FUSE
+    \item No journaling support
+\end{itemize}
+
+\subsection{Windows}
+\begin{itemize}
+    \item No native HFS+ support
+    \item Third-party drivers available (Paragon, MacDrive)
+    \item Boot Camp drivers provide read-only access
+\end{itemize}

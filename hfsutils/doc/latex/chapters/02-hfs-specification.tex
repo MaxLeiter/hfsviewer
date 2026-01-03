@@ -1,0 +1,472 @@
+\section{HFS Filesystem Overview}
+
+The Hierarchical File System (HFS) is the filesystem used by Apple Computer for Mac OS systems from 1985 until Mac OS X. Also known as "Mac OS Standard" or "HFS Classic", it provides a hierarchical directory structure with support for file and folder metadata.
+
+\subsection{Key Characteristics}
+
+\begin{itemize}
+    \item \textbf{Maximum volume size}: 2 TB (2,199,023,255,552 bytes)
+    \item \textbf{Maximum file size}: 2 GB (2,147,483,647 bytes)
+    \item \textbf{Filename length}: 31 bytes (Macintosh Roman encoding)
+    \item \textbf{Date range}: January 1, 1904 to February 6, 2028 (Y2K28 limit)
+    \item \textbf{Allocation block size}: 512 bytes minimum, 64 KB maximum
+    \item \textbf{Maximum allocation blocks}: 65,535 (16-bit addressing)
+    \item \textbf{Case sensitivity}: Case-insensitive, case-preserving
+    \item \textbf{Byte order}: Big-endian (MSB first)
+\end{itemize}
+
+\subsection{Volume Structure}
+
+An HFS volume is divided into \textbf{logical blocks} (512 bytes each) and \textbf{allocation blocks} (multiples of logical blocks).
+
+\subsubsection{Complete Volume Layout}
+
+\begin{longtable}{llp{8cm}}
+\toprule
+\textbf{Offset (bytes)} & \textbf{Size} & \textbf{Description} \\
+\midrule
+\endhead
+0 & 1024 & Boot blocks (2 logical blocks) \\
+1024 & 512 & Master Directory Block (MDB) \\
+1536 & Variable & Allocation bitmap start \\
+... & Variable & Extents B-tree file \\
+... & Variable & Catalog B-tree file \\
+... & Variable & File data area \\
+volume\_size - 1536 & 512 & (Reserved space) \\
+volume\_size - 1024 & 512 & Alternate MDB \\
+volume\_size - 512 & 512 & (Last logical block) \\
+\bottomrule
+\caption{HFS Physical Volume Layout}
+\end{longtable}
+
+\textbf{Critical Formula for Alternate MDB}:
+\begin{equation}
+\mathrm{Alt\_MDB\_offset} = \mathrm{total\_bytes} - 1024
+\end{equation}
+
+This is \textbf{NOT} \texttt{(total\_sectors - 2) * 512}. It is literally 1024 bytes before the end, regardless of sector size.
+
+\section{Master Directory Block (MDB) - Complete Specification}
+
+The MDB is the \textbf{single most critical structure} in HFS. It is located at byte offset 1024 and is exactly 162 bytes long.
+
+\subsection{MDB Complete Field Map - Every Byte Documented}
+
+\begin{longtable}{llllp{5cm}}
+\toprule
+\textbf{Offset} & \textbf{Field Name} & \textbf{Type} & \textbf{Bytes} & \textbf{Description} \\
+\midrule
+\endhead
++0 & drSigWord & uint16 & 2 & Signature: \textbf{0x4244} ('BD') \\
++2 & drCrDate & uint32 & 4 & Creation date (Mac time) \\
++6 & drLsMod & uint32 & 4 & Last modification date \\
++10 & drAtrb & uint16 & 2 & Volume attributes (see below) \\
++12 & drNmFls & uint16 & 2 & Files in root directory \\
++14 & drVBMSt & uint16 & 2 & First allocation bitmap block \\
++16 & drAllocPtr & uint16 & 2 & Start of next allocation search \\
++18 & drNmAlBlks & uint16 & 2 & Number of allocation blocks \\
++20 & drAlBlkSiz & uint32 & 4 & Allocation block size (bytes) \\
++24 & drClpSiz & uint32 & 4 & Default clump size \\
++28 & drAlBlSt & uint16 & 2 & First allocation block \\
++30 & drNxtCNID & uint32 & 4 & Next Catalog Node ID \\
++34 & drFreeBks & uint16 & 2 & Free allocation blocks \\
++36 & drVN & Pstring & 28 & Volume name (1 len + 27 chars) \\
++64 & drVolBkUp & uint32 & 4 & Last backup date \\
++68 & drVSeqNum & uint16 & 2 & Backup sequence number \\
++70 & drWrCnt & uint32 & 4 & Volume write count \\
++74 & drXTClpSiz & uint32 & 4 & Extents clump size \\
++78 & drCTClpSiz & uint32 & 4 & Catalog clump size \\
++82 & drNmRtDirs & uint16 & 2 & Directories in root \\
++84 & drFilCnt & uint32 & 4 & Total files on volume \\
++88 & drDirCnt & uint32 & 4 & Total directories \\
++92 & drFndrInfo & uint32[8] & 32 & Finder information \\
++124 & drVCSize & uint16 & 2 & Volume cache size \\
++126 & drVBMCSize & uint16 & 2 & Bitmap cache size \\
++128 & drCtlCSize & uint16 & 2 & Common cache size \\
++130 & drXTFlSize & uint32 & 4 & Extents file size \\
++134 & drXTExtRec & ExtRec[3] & 12 & Extents file extents \\
++146 & drCTFlSize & uint32 & 4 & Catalog file size \\
++150 & drCTExtRec & ExtRec[3] & 12 & Catalog file extents \\
+\bottomrule
+\caption{Master Directory Block Complete Structure (162 bytes total)}
+\end{longtable}
+
+\subsection{Critical Field Details - Bit-by-Bit}
+
+\subsubsection{drSigWord - Signature (Offset +0, 2 bytes)}
+
+\textbf{Value}: \texttt{0x4244} (big-endian)
+
+\textbf{Byte representation}:
+\begin{verbatim}
+Offset 1024: 0x42 ('B')
+Offset 1025: 0x44 ('D')
+\end{verbatim}
+
+\textbf{Validation}:
+\begin{itemize}
+    \item Must be exactly \texttt{0x4244}
+    \item Any other value = not HFS or corrupted
+    \item Endianness test: if you read \texttt{0x4442}, you're reading little-endian
+\end{itemize}
+
+\textbf{Oddity}: The origin of "BD" is unknown. Speculation includes "Block Device" but Apple never documented it.
+
+\subsubsection{drAtrb - Volume Attributes (Offset +10, 2 bytes)}
+
+16-bit flags field (big-endian). \textbf{Every bit documented}:
+
+\begin{longtable}{llp{7cm}}
+\toprule
+\textbf{Bit} & \textbf{Hex Mask} & \textbf{Meaning} \\
+\midrule
+\endhead
+0-6 & 0x007F & Reserved (must be 0) \\
+7 & 0x0080 & Volume locked by hardware \\
+\textbf{8} & \textbf{0x0100} & \textbf{Volume unmounted properly} \\
+9 & 0x0200 & Volume has spared bad blocks \\
+10 & 0x0400 & Volume needs consistency check (kNeedRebuild) \\
+11 & 0x0800 & Catalog node IDs reused (kBadCNID) \\
+12 & 0x1000 & Unused nodes fix needed \\
+13 & 0x2000 & Volume journaled (HFS+ only, not used in HFS) \\
+14 & 0x4000 & Software lock \\
+15 & 0x8000 & Spare boot blocks (not used) \\
+\bottomrule
+\caption{drAtrb Bit Definitions}
+\end{longtable}
+
+\textbf{Critical}: Bit 8 (0x0100) MUST be set for clean unmount. mkfs.hfs sets:
+\begin{verbatim}
+drAtrb = 0x0100  // Big-endian bytes: 0x01 0x00
+\end{verbatim}
+
+\textbf{Hex dump verification}:
+\begin{verbatim}
+xxd -s 1034 -l 2 -p volume.hfs
+Expected output: 0100
+\end{verbatim}
+
+\subsubsection{drNxtCNID - Next Catalog Node ID (Offset +30, 4 bytes)}
+
+\textbf{Value}: 32-bit unsigned integer, big-endian
+
+\textbf{Minimum}: \texttt{0x00000010} (16 decimal)
+
+\textbf{Reserved CNIDs 1-15}:
+\begin{longtable}{lp{8cm}}
+\toprule
+\textbf{CNID} & \textbf{Purpose} \\
+\midrule
+\endhead
+1 & Parent of root directory (kHFSRootParentID) \\
+2 & Root directory (kHFSRootFolderID) \\
+3 & Extents overflow file (kHFSExtentsFileID) \\
+4 & Catalog file (kHFSCatalogFileID) \\
+5 & Bad allocation blocks file (kHFSBadBlockFileID) \\
+6-15 & Reserved, not used in HFS \\
+\bottomrule
+\caption{Reserved Catalog Node IDs}
+\end{longtable}
+
+\textbf{Byte representation for value 16}:
+\begin{verbatim}
+Offset 1054: 0x00
+Offset 1055: 0x00
+Offset 1056: 0x00
+Offset 1057: 0x10
+\end{verbatim}
+
+\textbf{Common error}: If you see \texttt{0x00000000}, the MDB was not initialized correctly. The volume cannot be used.
+
+\subsubsection{drVN - Volume Name (Offset +36, 28 bytes)}
+
+\textbf{Format}: Pascal string (length-prefixed)
+
+\begin{itemize}
+    \item Byte 0: Length (0-27)
+    \item Bytes 1-27: Characters (Macintosh Roman encoding)
+\end{itemize}
+
+\textbf{Example}: "MyDisk"
+\begin{verbatim}
+Offset 1060: 0x06           // Length = 6
+Offset 1061: 0x4D ('M')
+Offset 1062: 0x79 ('y')
+Offset 1063: 0x44 ('D')
+Offset 1064: 0x69 ('i')
+Offset 1065: 0x73 ('s')
+Offset 1066: 0x6B ('k')
+Offset 1067-1087: 0x00     // Padding
+\end{verbatim}
+
+\textbf{Restrictions}:
+\begin{itemize}
+    \item Length: 1-27 bytes (0 = invalid)
+    \item Cannot contain colon (:) - path separator
+    \item Macintosh Roman encoding (not UTF-8!)
+\end{itemize}
+
+\textbf{Oddity}: Unlike HFS+, HFS uses Pascal strings (length prefix) instead of C strings (null-terminated).
+
+\subsection{Extent Records - Complete Structure}
+
+An extent record describes up to 3 contiguous runs of allocation blocks.
+
+\subsubsection{Extent Descriptor (4 bytes each)}
+
+\begin{longtable}{llp{6cm}}
+\toprule
+\textbf{Offset} & \textbf{Field} & \textbf{Description} \\
+\midrule
+\endhead
++0 & startBlock & First allocation block (uint16) \\
++2 & blockCount & Number of blocks (uint16) \\
+\bottomrule
+\caption{Extent Descriptor Structure}
+\end{longtable}
+
+\subsubsection{Extent Record (12 bytes)}
+
+3 consecutive extent descriptors:
+\begin{verbatim}
+ExtentRecord {
+    ExtentDescriptor[0]:  // Bytes 0-3
+        uint16 startBlock
+        uint16 blockCount
+    ExtentDescriptor[1]:  // Bytes 4-7
+        uint16 startBlock
+        uint16 blockCount
+    ExtentDescriptor[2]:  // Bytes 8-11
+        uint16 startBlock
+        uint16 blockCount
+}
+\end{verbatim}
+
+\textbf{Unused extents}: Set both fields to 0.
+
+\textbf{Example}: File uses blocks 100-109 and 200-249:
+\begin{verbatim}
+Extent[0]: startBlock=100, blockCount=10
+Extent[1]: startBlock=200, blockCount=50
+Extent[2]: startBlock=0,   blockCount=0   // Unused
+\end{verbatim}
+
+\subsection{Alternate MDB - Critical Backup}
+
+The alternate MDB is an \textbf{exact copy} of the primary MDB.
+
+\subsubsection{Location Calculation}
+
+\textbf{Precise formula}:
+\begin{equation}
+\mathrm{alt\_offset} = \mathrm{device\_size\_bytes} - 1024
+\end{equation}
+
+\textbf{Example for 10 MB volume}:
+\begin{verbatim}
+Device size: 10,485,760 bytes
+Alt MDB at:  10,485,760 - 1,024 = 10,484,736 bytes
+\end{verbatim}
+
+\textbf{Verification}:
+\begin{verbatim}
+FILESIZE=$(stat -c%s volume.hfs)
+ALTOFFSET=$((FILESIZE - 1024))
+xxd -s $ALTOFFSET -l 2 -p volume.hfs
+# Expected: 4244 (same signature as primary)
+\end{verbatim}
+
+\textbf{Common mistake}: Using \texttt{(num\_sectors - 2) * 512} assumes 512-byte sectors. The specification is \textbf{always} "1024 bytes before end", regardless of sector size.
+
+\section{HFS B-Trees - Complete Specification}
+
+\subsection{B-Tree Overview}
+
+HFS uses B-trees for the catalog (files/folders) and extents overflow (fragmented files).
+
+\subsubsection{Key Characteristics}
+
+\begin{itemize}
+    \item\textbf{Node size}: Fixed 512 bytes for HFS
+    \item \textbf{Balancing}: Self-balancing tree structure
+    \item \textbf{Key comparison}: Case-insensitive for catalog names
+    \item \textbf{Depth}: Typically 2-4 levels for most volumes
+\end{itemize}
+
+\subsection{Node Descriptor - First 14 Bytes of Every Node}
+
+\textbf{Every B-tree node} starts with this 14-byte header:
+
+\begin{longtable}{llp{7cm}}
+\toprule
+\textbf{Offset} & \textbf{Field} & \textbf{Description} \\
+\midrule
+\endhead
++0 & fLink & Forward link: next node at this level (uint32) \\
++4 & bLink & Backward link: previous node (uint32) \\
++8 & kind & Node type (int8, see below) \\
++9 & height & Node level: 0 = leaf, 1+ = index (uint8) \\
++10 & numRecords & Number of records in node (uint16) \\
++12 & reserved & Reserved, must be 0 (uint16) \\
+\bottomrule
+\caption{Node Descriptor (14 bytes)}
+\end{longtable}
+
+\subsubsection{Node Types (kind field)}
+
+\begin{longtable}{lp{8cm}}
+\toprule
+\textbf{Value} & \textbf{Meaning} \\
+\midrule
+\endhead
+-1 (0xFF) & Index node (internal) \\
+0 & Header node (node 0only) \\
+1 & Map node (allocation bitmap) \\
+2 & Leaf node (data records) \\
+\bottomrule
+\caption{B-Tree Node Types}
+\end{longtable}
+
+\textbf{Oddity}: Index nodes use -1 (signed), not 255 (unsigned). This is a signed int8 field.
+
+\subsection{Header Node (Node 0) - Complete Structure}
+
+The first node (offset 0 in B-tree file) is always the header node.
+
+\subsubsection{BTHeaderRec Structure (106 bytes)}
+
+Located at offset 14 (after node descriptor):
+
+\begin{longtable}{lllp{5cm}}
+\toprule
+\textbf{Offset} & \textbf{Field} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\endhead
++14 & treeDepth & uint16 & Current depth (0 = empty) \\
++16 & rootNode & uint32 & Node number of root \\
++20 & leafRecords & uint32 & Total leaf records \\
++24 & firstLeafNode & uint32 & First leaf node number \\
++28 & lastLeafNode & uint32 & Last leaf node number \\
++32 & nodeSize & uint16 & Node size (\textbf{512 for HFS}) \\
++34 & maxKeyLength & uint16 & Maximum key length \\
++36 & totalNodes & uint32 & Total nodes in tree \\
++40 & freeNodes & uint32 & Unused nodes \\
++44 & reserved1 & uint16 & Reserved \\
++46 & clumpSize & uint32 & Clump size (bytes) \\
++50 & btreeType & uint8 & 0=Catalog, 255=Extents \\
++51 & reserved2 & uint8 & Reserved \\
++52 & attributes & uint32 & B-tree attributes \\
++56 & reserved3 & uint8[64] & Reserved\\
+\bottomrule
+\caption{BTHeaderRec Structure}
+\end{longtable}
+
+\textbf{Critical}: nodeSize MUST be 512 for HFS. HFS+ uses 4096, but HFS is fixed at 512.
+
+\subsection{Date/Time Representation}
+
+HFS uses Mac absolute time: unsigned 32-bit seconds since midnight, January 1, 1904 GMT.
+
+\textbf{Conversion formulas}:
+\begin{verbatim}
+MAC_EPOCH = 2082844800  // Offset from Unix epoch
+
+Unix to Mac: mac_time = unix_time + MAC_EPOCH
+Mac to Unix: unix_time = mac_time - MAC_EPOCH
+\end{verbatim}
+
+\textbf{Y2K28 Problem}:
+\begin{equation}
+\mathrm{Max\_date} = 1904 + \frac{2^{32}}{365.25 \times 24 \times 3600} \approx 2028
+\end{equation}
+
+Specifically: February 6, 2028, 06:28:15 GMT
+
+\textbf{Safe date handling}: hfsutils uses \texttt{hfs\_get\_safe\_time()} which caps dates at 2028.
+
+\section{Byte Order (Endianness) - Critical}
+
+\textbf{All HFS multi-byte fields are big-endian}.
+
+\subsection{Endianness Examples}
+
+\textbf{16-bit value 0x1234}:
+\begin{verbatim}
+Byte 0: 0x12 (MSB)
+Byte 1: 0x34 (LSB)
+\end{verbatim}
+
+\textbf{32-bit value 0x12345678}:
+\begin{verbatim}
+Byte 0: 0x12 (Most significant)
+Byte 1: 0x34
+Byte 2: 0x56
+Byte 3: 0x78 (Least significant)
+\end{verbatim}
+
+\textbf{Writing code}:
+\begin{verbatim}
+// WRONG - host byte order
+uint16_t value = 0x4244;
+write(fd, &value, 2);  // Writes 0x44 0x42 on little-endian!
+
+// CORRECT - explicit byte order
+unsigned char sig[2] = {0x42, 0x44};
+write(fd, sig, 2);     // Always correct
+\end{verbatim}
+
+\section{Oddities, Edge Cases, and Implementation Notes}
+
+\subsection{The 16-Bit Limitation}
+
+HFS uses 16-bit allocation block numbers, limiting volumes to 65,535 blocks maximum.
+
+\textbf{Volume size calculation}:
+\begin{equation}
+\mathrm{max\_volume} = 65535 \times \mathrm{block\_size}
+\end{equation}
+
+For 32 KB blocks:
+\begin{equation}
+65535 \times 32768 = 2,147,450,880~\mathrm{bytes} \approx 2~\mathrm{GB}
+\end{equation}
+
+\textbf{Limitation}: Cannot create HFS volumes larger than \textasciitilde2 TB (with 64 KB blocks).
+
+\subsection{Pascal Strings vs C Strings}
+
+\textbf{Pascal string} (HFS): Length byte + data
+\begin{verbatim}
+"\x06Hello!"  // Byte 0 = length, followed by data
+\end{verbatim}
+
+\textbf{C string}: Null-terminated
+\begin{verbatim}
+"Hello!\0"    // Ends with null byte
+\end{verbatim}
+
+\textbf{Gotcha}: A Pascal string of length 0 is valid (empty string). A C string must have at least the null terminator.
+
+\subsection{Allocation Block Alignment}
+
+File data MUST start on allocation block boundaries. You cannot start a file in the middle of a block.
+
+\textbf{Implication}: Small files waste space. If block size is 4 KB, a 1-byte file wastes 4095 bytes.
+
+\subsection{MacRoman Character Encoding}
+
+HFS uses MacRoman, not ASCII or UTF-8.
+
+\textbf{Differences from ASCII}:
+\begin{itemize}
+    \item Characters 0-127: Same as ASCII
+    \item Characters 128-255: Different from ISO-8859-1
+\end{itemize}
+
+\textbf{Example oddities}:
+\begin{itemize}
+    \item 0xD0 = en dash (—) in MacRoman, Ð in ISO-8859-1
+    \item 0xD1 = em dash (—) in MacRoman, Ñ in ISO-8859-1
+\end{itemize}
+
+\textbf{Implementation}: For maximum compatibility, restrict filenames to ASCII 32-126.
