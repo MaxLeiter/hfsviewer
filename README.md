@@ -60,5 +60,5 @@ The project links against the included hfsutils library.
 
 ## Notes
 
-- This app provides read-only access to HFS volumes
-- Does not support writing to HFS volumes
+- This app provides read-only access to HFS volumes. 
+- Write access is in beta and not recommended.

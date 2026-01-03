@@ -539,7 +539,10 @@ struct FileListView: View {
             .width(100)
         }
         .tableStyle(.inset(alternatesRowBackgrounds: true))
-        .onTapGesture(count: 2) {
+        .contextMenu(forSelectionType: UInt32.self) { items in
+            // Context menu items will be handled by FileRowView's contextMenu
+        } primaryAction: { items in
+            // Double-click action
             handleReturnPress()
         }
         .onKeyPress(.return) {
