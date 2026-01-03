@@ -1,0 +1,441 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		50D654822F08F04C00294350 /* libcdata.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654712F08F04C00294350 /* libcdata.a */; };
+		50D654832F08F04C00294350 /* libfshfs.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654722F08F04C00294350 /* libfshfs.a */; };
+		50D654842F08F04C00294350 /* libfguid.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654732F08F04C00294350 /* libfguid.a */; };
+		50D654852F08F04C00294350 /* libfmos.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654742F08F04C00294350 /* libfmos.a */; };
+		50D654862F08F04C00294350 /* libcerror.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654752F08F04C00294350 /* libcerror.a */; };
+		50D654872F08F04C00294350 /* libhmac.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654762F08F04C00294350 /* libhmac.a */; };
+		50D654882F08F04C00294350 /* libuna.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654772F08F04C00294350 /* libuna.a */; };
+		50D654892F08F04C00294350 /* libcnotify.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654782F08F04C00294350 /* libcnotify.a */; };
+		50D6548A2F08F04C00294350 /* libfcache.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654792F08F04C00294350 /* libfcache.a */; };
+		50D6548B2F08F04C00294350 /* libfdata.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D6547A2F08F04C00294350 /* libfdata.a */; };
+		50D6548C2F08F04C00294350 /* libcpath.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D6547B2F08F04C00294350 /* libcpath.a */; };
+		50D6548D2F08F04C00294350 /* libcthreads.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D6547C2F08F04C00294350 /* libcthreads.a */; };
+		50D6548E2F08F04C00294350 /* libbfio.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D6547D2F08F04C00294350 /* libbfio.a */; };
+		50D6548F2F08F04C00294350 /* libfdatetime.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D6547E2F08F04C00294350 /* libfdatetime.a */; };
+		50D654902F08F04C00294350 /* libclocale.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D6547F2F08F04C00294350 /* libclocale.a */; };
+		50D654912F08F04C00294350 /* libcsplit.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654802F08F04C00294350 /* libcsplit.a */; };
+		50D654922F08F04C00294350 /* libcfile.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654812F08F04C00294350 /* libcfile.a */; };
+		50D654942F08F2F900294350 /* libhfs.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654932F08F2F900294350 /* libhfs.a */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		501A24592F08E7CF002AA740 /* com.maxleiter.HFSViewer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = com.maxleiter.HFSViewer.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		501A24922F08ED9C002AA740 /* libfshfs.1.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libfshfs.1.dylib; path = ../libfshfs/libfshfs/.libs/libfshfs.1.dylib; sourceTree = "<group>"; };
+		50D6546D2F08EFEB00294350 /* libfshfs.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libfshfs.a; path = ../libfshfs/libfshfs/.libs/libfshfs.a; sourceTree = "<group>"; };
+		50D6546F2F08F02200294350 /* libcdata.la */ = {isa = PBXFileReference; lastKnownFileType = text; name = libcdata.la; path = ../libfshfs/libcdata/libcdata.la; sourceTree = "<group>"; };
+		50D654712F08F04C00294350 /* libcdata.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libcdata.a; path = libs/libcdata.a; sourceTree = "<group>"; };
+		50D654722F08F04C00294350 /* libfshfs.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libfshfs.a; path = libs/libfshfs.a; sourceTree = "<group>"; };
+		50D654732F08F04C00294350 /* libfguid.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libfguid.a; path = libs/libfguid.a; sourceTree = "<group>"; };
+		50D654742F08F04C00294350 /* libfmos.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libfmos.a; path = libs/libfmos.a; sourceTree = "<group>"; };
+		50D654752F08F04C00294350 /* libcerror.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libcerror.a; path = libs/libcerror.a; sourceTree = "<group>"; };
+		50D654762F08F04C00294350 /* libhmac.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libhmac.a; path = libs/libhmac.a; sourceTree = "<group>"; };
+		50D654772F08F04C00294350 /* libuna.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libuna.a; path = libs/libuna.a; sourceTree = "<group>"; };
+		50D654782F08F04C00294350 /* libcnotify.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libcnotify.a; path = libs/libcnotify.a; sourceTree = "<group>"; };
+		50D654792F08F04C00294350 /* libfcache.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libfcache.a; path = libs/libfcache.a; sourceTree = "<group>"; };
+		50D6547A2F08F04C00294350 /* libfdata.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libfdata.a; path = libs/libfdata.a; sourceTree = "<group>"; };
+		50D6547B2F08F04C00294350 /* libcpath.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libcpath.a; path = libs/libcpath.a; sourceTree = "<group>"; };
+		50D6547C2F08F04C00294350 /* libcthreads.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libcthreads.a; path = libs/libcthreads.a; sourceTree = "<group>"; };
+		50D6547D2F08F04C00294350 /* libbfio.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libbfio.a; path = libs/libbfio.a; sourceTree = "<group>"; };
+		50D6547E2F08F04C00294350 /* libfdatetime.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libfdatetime.a; path = libs/libfdatetime.a; sourceTree = "<group>"; };
+		50D6547F2F08F04C00294350 /* libclocale.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libclocale.a; path = libs/libclocale.a; sourceTree = "<group>"; };
+		50D654802F08F04C00294350 /* libcsplit.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libcsplit.a; path = libs/libcsplit.a; sourceTree = "<group>"; };
+		50D654812F08F04C00294350 /* libcfile.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libcfile.a; path = libs/libcfile.a; sourceTree = "<group>"; };
+		50D654932F08F2F900294350 /* libhfs.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libhfs.a; path = libs/libhfs.a; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		501A245B2F08E7CF002AA740 /* com.maxleiter.HFSViewer */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = com.maxleiter.HFSViewer;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		501A24562F08E7CF002AA740 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				50D654942F08F2F900294350 /* libhfs.a in Frameworks */,
+				50D654822F08F04C00294350 /* libcdata.a in Frameworks */,
+				50D654832F08F04C00294350 /* libfshfs.a in Frameworks */,
+				50D654842F08F04C00294350 /* libfguid.a in Frameworks */,
+				50D654852F08F04C00294350 /* libfmos.a in Frameworks */,
+				50D654862F08F04C00294350 /* libcerror.a in Frameworks */,
+				50D654872F08F04C00294350 /* libhmac.a in Frameworks */,
+				50D654882F08F04C00294350 /* libuna.a in Frameworks */,
+				50D654892F08F04C00294350 /* libcnotify.a in Frameworks */,
+				50D6548A2F08F04C00294350 /* libfcache.a in Frameworks */,
+				50D6548B2F08F04C00294350 /* libfdata.a in Frameworks */,
+				50D6548C2F08F04C00294350 /* libcpath.a in Frameworks */,
+				50D6548D2F08F04C00294350 /* libcthreads.a in Frameworks */,
+				50D6548E2F08F04C00294350 /* libbfio.a in Frameworks */,
+				50D6548F2F08F04C00294350 /* libfdatetime.a in Frameworks */,
+				50D654902F08F04C00294350 /* libclocale.a in Frameworks */,
+				50D654912F08F04C00294350 /* libcsplit.a in Frameworks */,
+				50D654922F08F04C00294350 /* libcfile.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		501A24502F08E7CF002AA740 = {
+			isa = PBXGroup;
+			children = (
+				501A245B2F08E7CF002AA740 /* com.maxleiter.HFSViewer */,
+				501A24912F08ED9C002AA740 /* Frameworks */,
+				501A245A2F08E7CF002AA740 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		501A245A2F08E7CF002AA740 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				501A24592F08E7CF002AA740 /* com.maxleiter.HFSViewer.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		501A24912F08ED9C002AA740 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				50D654932F08F2F900294350 /* libhfs.a */,
+				50D6547D2F08F04C00294350 /* libbfio.a */,
+				50D654712F08F04C00294350 /* libcdata.a */,
+				50D654752F08F04C00294350 /* libcerror.a */,
+				50D654812F08F04C00294350 /* libcfile.a */,
+				50D6547F2F08F04C00294350 /* libclocale.a */,
+				50D654782F08F04C00294350 /* libcnotify.a */,
+				50D6547B2F08F04C00294350 /* libcpath.a */,
+				50D654802F08F04C00294350 /* libcsplit.a */,
+				50D6547C2F08F04C00294350 /* libcthreads.a */,
+				50D654792F08F04C00294350 /* libfcache.a */,
+				50D6547A2F08F04C00294350 /* libfdata.a */,
+				50D6547E2F08F04C00294350 /* libfdatetime.a */,
+				50D654732F08F04C00294350 /* libfguid.a */,
+				50D654742F08F04C00294350 /* libfmos.a */,
+				50D654722F08F04C00294350 /* libfshfs.a */,
+				50D654762F08F04C00294350 /* libhmac.a */,
+				50D654772F08F04C00294350 /* libuna.a */,
+				50D6546F2F08F02200294350 /* libcdata.la */,
+				50D6546D2F08EFEB00294350 /* libfshfs.a */,
+				501A24922F08ED9C002AA740 /* libfshfs.1.dylib */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		501A24582F08E7CF002AA740 /* com.maxleiter.HFSViewer */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 501A24662F08E7D0002AA740 /* Build configuration list for PBXNativeTarget "com.maxleiter.HFSViewer" */;
+			buildPhases = (
+				501A24552F08E7CF002AA740 /* Sources */,
+				501A24562F08E7CF002AA740 /* Frameworks */,
+				501A24572F08E7CF002AA740 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				501A245B2F08E7CF002AA740 /* com.maxleiter.HFSViewer */,
+			);
+			name = com.maxleiter.HFSViewer;
+			packageProductDependencies = (
+			);
+			productName = com.maxleiter.HFSViewer;
+			productReference = 501A24592F08E7CF002AA740 /* com.maxleiter.HFSViewer.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		501A24512F08E7CF002AA740 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2620;
+				LastUpgradeCheck = 2620;
+				TargetAttributes = {
+					501A24582F08E7CF002AA740 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+				};
+			};
+			buildConfigurationList = 501A24542F08E7CF002AA740 /* Build configuration list for PBXProject "com.maxleiter.HFSViewer" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 501A24502F08E7CF002AA740;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 501A245A2F08E7CF002AA740 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				501A24582F08E7CF002AA740 /* com.maxleiter.HFSViewer */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		501A24572F08E7CF002AA740 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		501A24552F08E7CF002AA740 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		501A24642F08E7D0002AA740 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 4Q2EQB243C;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		501A24652F08E7D0002AA740 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 4Q2EQB243C;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.1;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		501A24672F08E7D0002AA740 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4Q2EQB243C;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/libs";
+				MARKETING_VERSION = 1.0;
+				OTHER_CODE_SIGN_FLAGS = "--deep";
+				OTHER_LDFLAGS = (
+					"-lpthread",
+					"-lz",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.maxleiter.com-maxleiter-HFSViewer";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/com.maxleiter.HFSViewer/HFSViewer-Bridging-Header.h";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		501A24682F08E7D0002AA740 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4Q2EQB243C;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/libs";
+				MARKETING_VERSION = 1.0;
+				OTHER_CODE_SIGN_FLAGS = "--deep";
+				OTHER_LDFLAGS = (
+					"-lpthread",
+					"-lz",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.maxleiter.com-maxleiter-HFSViewer";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/com.maxleiter.HFSViewer/HFSViewer-Bridging-Header.h";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		501A24542F08E7CF002AA740 /* Build configuration list for PBXProject "com.maxleiter.HFSViewer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				501A24642F08E7D0002AA740 /* Debug */,
+				501A24652F08E7D0002AA740 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		501A24662F08E7D0002AA740 /* Build configuration list for PBXNativeTarget "com.maxleiter.HFSViewer" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				501A24672F08E7D0002AA740 /* Debug */,
+				501A24682F08E7D0002AA740 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 501A24512F08E7CF002AA740 /* Project object */;
+}
