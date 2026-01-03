@@ -279,8 +279,30 @@ class HFSViewModel: ObservableObject {
                     try await loadDirectoryContents(for: root)
                 }
             } catch {
-                self.errorMessage = error.localizedDescription
-                self.showError = true
+                // If write mode failed, try falling back to read-only
+                if mode == .readWrite {
+                    do {
+                        let newVolume = try HFSVolume(path: url.path, mode: .readOnly)
+                        self.volume = newVolume
+                        self.currentDirectory = newVolume.rootEntry
+                        self.navigationPath = []
+
+                        if let root = newVolume.rootEntry {
+                            self.navigationPath = [root]
+                            try await loadDirectoryContents(for: root)
+                        }
+
+                        // Show warning that we opened in read-only mode
+                        self.errorMessage = "Opened in read-only mode: insufficient permissions for write access"
+                        self.showError = true
+                    } catch {
+                        self.errorMessage = error.localizedDescription
+                        self.showError = true
+                    }
+                } else {
+                    self.errorMessage = error.localizedDescription
+                    self.showError = true
+                }
             }
             self.isLoading = false
         }

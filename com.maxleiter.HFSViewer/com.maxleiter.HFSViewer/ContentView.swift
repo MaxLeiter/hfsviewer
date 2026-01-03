@@ -211,7 +211,7 @@ struct ContentView: View {
         }
         .overlay {
             if viewModel.volume == nil {
-                WelcomeView(showOpenPanel: $showOpenPanel, viewModel: viewModel)
+                WelcomeView(showOpenPanel: $showOpenPanel, enableWriteMode: $enableWriteMode, viewModel: viewModel)
                     .allowsHitTesting(true)
             }
         }
@@ -223,9 +223,9 @@ struct ContentView: View {
 
 struct WelcomeView: View {
     @Binding var showOpenPanel: Bool
+    @Binding var enableWriteMode: Bool
     @State private var devicePath: String = "/dev/rdisk4"
     @State private var showDeviceInput = false
-    @State private var enableWriteMode = false
     @ObservedObject var viewModel: HFSViewModel
 
     var body: some View {
