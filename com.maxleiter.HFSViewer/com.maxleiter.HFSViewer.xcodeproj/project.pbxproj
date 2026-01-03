@@ -7,48 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		50D654822F08F04C00294350 /* libcdata.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654712F08F04C00294350 /* libcdata.a */; };
-		50D654832F08F04C00294350 /* libfshfs.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654722F08F04C00294350 /* libfshfs.a */; };
-		50D654842F08F04C00294350 /* libfguid.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654732F08F04C00294350 /* libfguid.a */; };
-		50D654852F08F04C00294350 /* libfmos.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654742F08F04C00294350 /* libfmos.a */; };
-		50D654862F08F04C00294350 /* libcerror.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654752F08F04C00294350 /* libcerror.a */; };
-		50D654872F08F04C00294350 /* libhmac.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654762F08F04C00294350 /* libhmac.a */; };
-		50D654882F08F04C00294350 /* libuna.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654772F08F04C00294350 /* libuna.a */; };
-		50D654892F08F04C00294350 /* libcnotify.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654782F08F04C00294350 /* libcnotify.a */; };
-		50D6548A2F08F04C00294350 /* libfcache.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654792F08F04C00294350 /* libfcache.a */; };
-		50D6548B2F08F04C00294350 /* libfdata.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D6547A2F08F04C00294350 /* libfdata.a */; };
-		50D6548C2F08F04C00294350 /* libcpath.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D6547B2F08F04C00294350 /* libcpath.a */; };
-		50D6548D2F08F04C00294350 /* libcthreads.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D6547C2F08F04C00294350 /* libcthreads.a */; };
-		50D6548E2F08F04C00294350 /* libbfio.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D6547D2F08F04C00294350 /* libbfio.a */; };
-		50D6548F2F08F04C00294350 /* libfdatetime.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D6547E2F08F04C00294350 /* libfdatetime.a */; };
-		50D654902F08F04C00294350 /* libclocale.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D6547F2F08F04C00294350 /* libclocale.a */; };
-		50D654912F08F04C00294350 /* libcsplit.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654802F08F04C00294350 /* libcsplit.a */; };
-		50D654922F08F04C00294350 /* libcfile.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654812F08F04C00294350 /* libcfile.a */; };
 		50D654942F08F2F900294350 /* libhfs.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 50D654932F08F2F900294350 /* libhfs.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		501A24592F08E7CF002AA740 /* com.maxleiter.HFSViewer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = com.maxleiter.HFSViewer.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		501A24922F08ED9C002AA740 /* libfshfs.1.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libfshfs.1.dylib; path = ../libfshfs/libfshfs/.libs/libfshfs.1.dylib; sourceTree = "<group>"; };
-		50D6546D2F08EFEB00294350 /* libfshfs.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libfshfs.a; path = ../libfshfs/libfshfs/.libs/libfshfs.a; sourceTree = "<group>"; };
-		50D6546F2F08F02200294350 /* libcdata.la */ = {isa = PBXFileReference; lastKnownFileType = text; name = libcdata.la; path = ../libfshfs/libcdata/libcdata.la; sourceTree = "<group>"; };
-		50D654712F08F04C00294350 /* libcdata.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libcdata.a; path = libs/libcdata.a; sourceTree = "<group>"; };
-		50D654722F08F04C00294350 /* libfshfs.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libfshfs.a; path = libs/libfshfs.a; sourceTree = "<group>"; };
-		50D654732F08F04C00294350 /* libfguid.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libfguid.a; path = libs/libfguid.a; sourceTree = "<group>"; };
-		50D654742F08F04C00294350 /* libfmos.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libfmos.a; path = libs/libfmos.a; sourceTree = "<group>"; };
-		50D654752F08F04C00294350 /* libcerror.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libcerror.a; path = libs/libcerror.a; sourceTree = "<group>"; };
-		50D654762F08F04C00294350 /* libhmac.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libhmac.a; path = libs/libhmac.a; sourceTree = "<group>"; };
-		50D654772F08F04C00294350 /* libuna.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libuna.a; path = libs/libuna.a; sourceTree = "<group>"; };
-		50D654782F08F04C00294350 /* libcnotify.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libcnotify.a; path = libs/libcnotify.a; sourceTree = "<group>"; };
-		50D654792F08F04C00294350 /* libfcache.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libfcache.a; path = libs/libfcache.a; sourceTree = "<group>"; };
-		50D6547A2F08F04C00294350 /* libfdata.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libfdata.a; path = libs/libfdata.a; sourceTree = "<group>"; };
-		50D6547B2F08F04C00294350 /* libcpath.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libcpath.a; path = libs/libcpath.a; sourceTree = "<group>"; };
-		50D6547C2F08F04C00294350 /* libcthreads.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libcthreads.a; path = libs/libcthreads.a; sourceTree = "<group>"; };
-		50D6547D2F08F04C00294350 /* libbfio.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libbfio.a; path = libs/libbfio.a; sourceTree = "<group>"; };
-		50D6547E2F08F04C00294350 /* libfdatetime.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libfdatetime.a; path = libs/libfdatetime.a; sourceTree = "<group>"; };
-		50D6547F2F08F04C00294350 /* libclocale.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libclocale.a; path = libs/libclocale.a; sourceTree = "<group>"; };
-		50D654802F08F04C00294350 /* libcsplit.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libcsplit.a; path = libs/libcsplit.a; sourceTree = "<group>"; };
-		50D654812F08F04C00294350 /* libcfile.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libcfile.a; path = libs/libcfile.a; sourceTree = "<group>"; };
 		50D654932F08F2F900294350 /* libhfs.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libhfs.a; path = libs/libhfs.a; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -66,23 +29,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				50D654942F08F2F900294350 /* libhfs.a in Frameworks */,
-				50D654822F08F04C00294350 /* libcdata.a in Frameworks */,
-				50D654832F08F04C00294350 /* libfshfs.a in Frameworks */,
-				50D654842F08F04C00294350 /* libfguid.a in Frameworks */,
-				50D654852F08F04C00294350 /* libfmos.a in Frameworks */,
-				50D654862F08F04C00294350 /* libcerror.a in Frameworks */,
-				50D654872F08F04C00294350 /* libhmac.a in Frameworks */,
-				50D654882F08F04C00294350 /* libuna.a in Frameworks */,
-				50D654892F08F04C00294350 /* libcnotify.a in Frameworks */,
-				50D6548A2F08F04C00294350 /* libfcache.a in Frameworks */,
-				50D6548B2F08F04C00294350 /* libfdata.a in Frameworks */,
-				50D6548C2F08F04C00294350 /* libcpath.a in Frameworks */,
-				50D6548D2F08F04C00294350 /* libcthreads.a in Frameworks */,
-				50D6548E2F08F04C00294350 /* libbfio.a in Frameworks */,
-				50D6548F2F08F04C00294350 /* libfdatetime.a in Frameworks */,
-				50D654902F08F04C00294350 /* libclocale.a in Frameworks */,
-				50D654912F08F04C00294350 /* libcsplit.a in Frameworks */,
-				50D654922F08F04C00294350 /* libcfile.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -110,26 +56,6 @@
 			isa = PBXGroup;
 			children = (
 				50D654932F08F2F900294350 /* libhfs.a */,
-				50D6547D2F08F04C00294350 /* libbfio.a */,
-				50D654712F08F04C00294350 /* libcdata.a */,
-				50D654752F08F04C00294350 /* libcerror.a */,
-				50D654812F08F04C00294350 /* libcfile.a */,
-				50D6547F2F08F04C00294350 /* libclocale.a */,
-				50D654782F08F04C00294350 /* libcnotify.a */,
-				50D6547B2F08F04C00294350 /* libcpath.a */,
-				50D654802F08F04C00294350 /* libcsplit.a */,
-				50D6547C2F08F04C00294350 /* libcthreads.a */,
-				50D654792F08F04C00294350 /* libfcache.a */,
-				50D6547A2F08F04C00294350 /* libfdata.a */,
-				50D6547E2F08F04C00294350 /* libfdatetime.a */,
-				50D654732F08F04C00294350 /* libfguid.a */,
-				50D654742F08F04C00294350 /* libfmos.a */,
-				50D654722F08F04C00294350 /* libfshfs.a */,
-				50D654762F08F04C00294350 /* libhmac.a */,
-				50D654772F08F04C00294350 /* libuna.a */,
-				50D6546F2F08F02200294350 /* libcdata.la */,
-				50D6546D2F08EFEB00294350 /* libfshfs.a */,
-				501A24922F08ED9C002AA740 /* libfshfs.1.dylib */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -339,6 +265,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -349,6 +276,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = "";
+				INFOPLIST_KEY_CFBundleDisplayName = "HFS Viewer";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -379,6 +308,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -389,6 +319,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = "";
+				INFOPLIST_KEY_CFBundleDisplayName = "HFS Viewer";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

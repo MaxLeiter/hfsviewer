@@ -4,6 +4,21 @@
 //
 //  Main view for the HFS Viewer application
 //
+//  Copyright (C) 2026 Max Leiter
+//
+//  This program is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  This program is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with this program. If not, see <https://www.gnu.org/licenses/>.
+//
 
 import SwiftUI
 import UniformTypeIdentifiers
@@ -125,8 +140,9 @@ struct WelcomeView: View {
             Text("HFS Viewer")
                 .font(.largeTitle)
                 .fontWeight(.bold)
+                .focusable(false)
 
-            Text("Open an HFS or HFS+ volume to browse its contents")
+            Text("Open a classic HFS volume to browse its contents")
                 .foregroundStyle(.secondary)
 
             Button("Open File or Disk Image...") {
@@ -158,7 +174,7 @@ struct WelcomeView: View {
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
             }
 
-            Text("Supports: HFS, HFS+, .dmg, .img, /dev/diskX devices")
+            Text("Supports: Classic HFS volumes, .dmg, .img, /dev/diskX devices")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
@@ -280,6 +296,7 @@ struct DirectoryTreeView: View {
 struct FileListView: View {
     @ObservedObject var viewModel: HFSViewModel
     @State private var quickLookURL: URL?
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         ZStack {
@@ -312,19 +329,12 @@ struct FileListView: View {
             }
         }
         .navigationTitle(viewModel.currentDirectory?.name ?? "")
-        .onKeyPress(.space) {
-            handleSpacePress()
-            return .handled
-        }
-        .onKeyPress(.return) {
-            handleReturnPress()
-            return .handled
-        }
-        .onKeyPress("c", modifiers: .command) {
-            handleCopyPath()
-            return .handled
-        }
         .quickLookPreview($quickLookURL)
+        .focusable()
+        .focused($isFocused)
+        .onAppear {
+            isFocused = true
+        }
     }
 
     private var listView: some View {
@@ -334,7 +344,7 @@ struct FileListView: View {
                 viewModel.selectedEntry = viewModel.filteredAndSortedContents.first { $0.id == id }
             }
         )) {
-            TableColumn("Name", value: \.name) { entry in
+            TableColumn("Name") { entry in
                 FileRowView(entry: entry, viewModel: viewModel)
             }
             .width(min: 150, ideal: 200)
