@@ -21,6 +21,7 @@ for f in os data block low medium file btree node record volume hfs version; do
 done
 
 rm -f "$OUT"
-libtool -static -o "$OUT" "$OBJ_DIR"/*.o
+# Zero the archive timestamps so rebuilding unchanged sources gives an identical file
+ZERO_AR_DATE=1 libtool -static -o "$OUT" "$OBJ_DIR"/*.o
 
 echo "✓ Built $OUT ($(lipo -archs "$OUT"))"

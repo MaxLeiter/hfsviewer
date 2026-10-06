@@ -41,6 +41,10 @@ fi
 
 echo "→ Found app at: $APP_PATH"
 
+# Ad-hoc sign the whole bundle so both architectures have a valid signature
+echo "→ Signing..."
+codesign --force --deep --sign - "$APP_PATH"
+
 # Create releases directory
 mkdir -p "$RELEASE_DIR"
 
