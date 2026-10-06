@@ -118,6 +118,8 @@ typedef struct {
 
 # define HFS_SIGWORD		0x4244
 # define HFS_SIGWORD_MFS	((Integer) 0xd2d7)
+# define HFS_SIGWORD_PLUS	0x482b
+# define HFS_SIGWORD_HFSX	0x4858
 
 # define HFS_ATRB_BUSY		(1 <<  6)
 # define HFS_ATRB_HLOCKED	(1 <<  7)

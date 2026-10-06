@@ -291,9 +291,17 @@ int v_readmdb(hfsvol *vol)
     {
       if (vol->mdb.drSigWord == HFS_SIGWORD_MFS)
 	ERROR(EINVAL, "MFS volume format not supported");
+      else if (vol->mdb.drSigWord == HFS_SIGWORD_PLUS ||
+	       vol->mdb.drSigWord == HFS_SIGWORD_HFSX)
+	ERROR(EINVAL, "HFS+ volume format not supported");
       else
 	ERROR(EINVAL, "not a Macintosh HFS volume");
     }
+
+  /* an HFS+ volume embedded in an HFS wrapper only exposes a placeholder */
+
+  if (vol->mdb.drEmbedSigWord == HFS_SIGWORD_PLUS)
+    ERROR(EINVAL, "HFS+ volume format not supported");
 
   if (vol->mdb.drAlBlkSiz % HFS_BLOCKSZ != 0)
     ERROR(EINVAL, "bad volume allocation block size");

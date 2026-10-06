@@ -13,6 +13,9 @@ VERSION=$(date +"%Y.%m.%d")
 BUILD_DIR="build"
 RELEASE_DIR="releases"
 
+# Rebuild libhfs so the app links the current hfsutils sources
+"$(dirname "$0")/build-libhfs.sh"
+
 # Clean and build
 echo "→ Cleaning..."
 xcodebuild clean -project "$PROJECT" -scheme "$SCHEME" -configuration Release > /dev/null 2>&1
@@ -22,6 +25,7 @@ xcodebuild build \
   -project "$PROJECT" \
   -scheme "$SCHEME" \
   -configuration Release \
+  -destination "generic/platform=macOS" \
   -derivedDataPath "$BUILD_DIR" \
   CODE_SIGN_IDENTITY="-" \
   CODE_SIGNING_REQUIRED=NO \
