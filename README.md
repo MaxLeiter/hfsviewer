@@ -9,10 +9,11 @@ This app was created to access an HFS-formatted USB 2.0 drive on a modern M4 Mac
 ## Features
 
 - Browse HFS (classic) volumes
-- Read files from HFS volumes
-- View file metadata (dates, permissions, sizes)
+- Export files with their resource forks and Finder type/creator codes
+- View file metadata (dates, type/creator codes, fork sizes)
 - Navigate directory structures
-- Support for both disk images and physical volumes
+- Open raw images (.img, .iso, .toast), compressed disk images (.dmg), and devices like CD drives
+- Partitioned media (e.g. CDs with an Apple Partition Map), including disks with several HFS volumes
 
 ## What's Included
 
@@ -44,21 +45,25 @@ This creates a release build and packages it as a zip file in the `releases/` di
 
 Open the `.xcodeproj` file in the `com.maxleiter.HFSViewer` directory in Xcode and build.
 
-The project links against the included hfsutils library.
+The project links against `libs/libhfs.a`, built from `hfsutils/libhfs`. After changing libhfs, rebuild it with:
+
+```bash
+./build-libhfs.sh
+```
 
 ## Usage
 
 1. Launch the app
-2. Select "Open HFS Volume..." from the File menu
-3. Choose an HFS disk image or device
-4. Browse the volume contents
+2. Click "Open File or Disk Image..." (or press ⌘O) and choose an image, or click "Open Device Path..." and enter a device such as `/dev/disk4` (find it with `diskutil list`)
+3. Browse the volume contents. If the disk has several HFS volumes, pick one under "Partitions" in the sidebar
 
 ## Requirements
 
-- macOS 12.0 or later
+- macOS 14.0 or later
 - Apple Silicon (M1/M2/M3/M4) or Intel Mac
 
 ## Notes
 
-- This app provides read-only access to HFS volumes. 
+- This app provides read-only access to HFS volumes by default.
 - Write access is in beta and not recommended.
+- HFS+ (Mac OS Extended) volumes aren't supported here, but macOS can open those directly.

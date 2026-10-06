@@ -26,7 +26,6 @@ import QuickLook
 
 struct ContentView: View {
     @StateObject private var viewModel = HFSViewModel()
-    @State private var showOpenPanel = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var enableWriteMode = false
     @State private var showImportFilePicker = false
@@ -109,7 +108,7 @@ struct ContentView: View {
                         .frame(width: 150)
                 }
 
-                Button(action: { showOpenPanel = true }) {
+                Button(action: { viewModel.showOpenPanel(mode: openMode) }) {
                     Image(systemName: "folder.badge.plus")
                 }
                 .help("Open HFS Volume")
@@ -120,22 +119,6 @@ struct ContentView: View {
                     }
                     .help("Close Volume")
                 }
-            }
-        }
-        .fileImporter(
-            isPresented: $showOpenPanel,
-            allowedContentTypes: [.diskImage, .data],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                if let url = urls.first {
-                    let mode: HFSVolumeMode = enableWriteMode ? .readWrite : .readOnly
-                    viewModel.openVolumeWithMode(at: url, mode: mode)
-                }
-            case .failure(let error):
-                viewModel.errorMessage = error.localizedDescription
-                viewModel.showError = true
             }
         }
         .alert("Error", isPresented: $viewModel.showError) {
@@ -161,18 +144,7 @@ struct ContentView: View {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
                 guard let entry = viewModel.selectedEntry else { return }
-                viewModel.checkWriteOperationSafety {
-                    Task {
-                        do {
-                            try await viewModel.deleteEntry(entry)
-                        } catch {
-                            await MainActor.run {
-                                viewModel.errorMessage = error.localizedDescription
-                                viewModel.showError = true
-                            }
-                        }
-                    }
-                }
+                viewModel.deleteEntry(entry)
             }
         } message: {
             if let entry = viewModel.selectedEntry {
@@ -187,18 +159,7 @@ struct ContentView: View {
             switch result {
             case .success(let urls):
                 guard let directory = viewModel.currentDirectory else { return }
-                viewModel.checkWriteOperationSafety {
-                    Task {
-                        do {
-                            try await viewModel.importFiles(urls, to: directory)
-                        } catch {
-                            await MainActor.run {
-                                viewModel.errorMessage = error.localizedDescription
-                                viewModel.showError = true
-                            }
-                        }
-                    }
-                }
+                viewModel.importFiles(urls, to: directory)
             case .failure(let error):
                 viewModel.errorMessage = error.localizedDescription
                 viewModel.showError = true
@@ -209,22 +170,33 @@ struct ContentView: View {
                 NewFolderDialog(directory: directory, viewModel: viewModel)
             }
         }
+        .quickLookPreview($viewModel.quickLookURL)
         .overlay {
             if viewModel.volume == nil {
-                WelcomeView(showOpenPanel: $showOpenPanel, enableWriteMode: $enableWriteMode, viewModel: viewModel)
+                WelcomeView(enableWriteMode: $enableWriteMode, viewModel: viewModel)
                     .allowsHitTesting(true)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openVolume)) { _ in
+            viewModel.showOpenPanel(mode: openMode)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            // Unmounting flushes pending writes and detaches any disk image
+            viewModel.closeVolume()
+        }
         .focusable(false)
+    }
+
+    private var openMode: HFSVolumeMode {
+        enableWriteMode ? .readWrite : .readOnly
     }
 }
 
 // MARK: - Welcome View
 
 struct WelcomeView: View {
-    @Binding var showOpenPanel: Bool
     @Binding var enableWriteMode: Bool
-    @State private var devicePath: String = "/dev/rdisk4"
+    @State private var devicePath: String = ""
     @State private var showDeviceInput = false
     @ObservedObject var viewModel: HFSViewModel
 
@@ -260,7 +232,7 @@ struct WelcomeView: View {
             .frame(maxWidth: 300)
 
             Button("Open File or Disk Image...") {
-                showOpenPanel = true
+                viewModel.showOpenPanel(mode: mode)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
@@ -275,29 +247,40 @@ struct WelcomeView: View {
 
             if showDeviceInput {
                 VStack(spacing: 12) {
-                    TextField("Device path (e.g., /dev/rdisk4)", text: $devicePath)
+                    TextField("Device path (e.g., /dev/disk4)", text: $devicePath)
                         .textFieldStyle(.roundedBorder)
                         .frame(maxWidth: 300)
+                        .onSubmit(openDevice)
 
-                    Button("Open") {
-                        let url = URL(fileURLWithPath: devicePath)
-                        let mode: HFSVolumeMode = enableWriteMode ? .readWrite : .readOnly
-                        viewModel.openVolumeWithMode(at: url, mode: mode)
-                        showDeviceInput = false
-                    }
-                    .buttonStyle(.borderedProminent)
+                    Text("Run `diskutil list` in Terminal to find the disk")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Button("Open", action: openDevice)
+                        .buttonStyle(.borderedProminent)
+                        .disabled(devicePath.isEmpty)
                 }
                 .padding()
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
             }
 
-            Text("Supports: Classic HFS volumes, .dmg, .img, /dev/diskX devices")
+            Text("Supports: Classic HFS volumes in .dmg, .img, .iso, .toast and other disk images, and /dev/diskN devices")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
         .focusable(false)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.background)
+    }
+
+    private var mode: HFSVolumeMode {
+        enableWriteMode ? .readWrite : .readOnly
+    }
+
+    private func openDevice() {
+        guard !devicePath.isEmpty else { return }
+        viewModel.openVolume(at: devicePath, mode: mode)
+        showDeviceInput = false
     }
 }
 
@@ -357,6 +340,17 @@ struct SidebarView: View {
                         .tag(volume.rootEntry)
                 }
 
+                if volume.partitions.count > 1 {
+                    Section("Partitions") {
+                        ForEach(volume.partitions) { partition in
+                            Button(action: { viewModel.openPartition(partition) }) {
+                                Label(partition.name, systemImage: partition.number == volume.partition ? "internaldrive.fill" : "internaldrive")
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
                 if let root = volume.rootEntry {
                     Section("Folders") {
                         DirectoryTreeView(entry: root, viewModel: viewModel, depth: 0)
@@ -394,17 +388,20 @@ struct DirectoryTreeView: View {
                     loadChildren()
                 }
             }
+            .onChange(of: viewModel.contentVersion) { _, _ in
+                if isLoaded {
+                    loadChildren()
+                }
+            }
         }
     }
 
     private func loadChildren() {
-        Task {
-            do {
-                children = try entry.getChildren()
-                isLoaded = true
-            } catch {
-                // Silently fail for tree loading
-            }
+        do {
+            children = try entry.getChildren()
+            isLoaded = true
+        } catch {
+            // Silently fail for tree loading
         }
     }
 }
@@ -413,41 +410,28 @@ struct DirectoryTreeView: View {
 
 struct FileListView: View {
     @ObservedObject var viewModel: HFSViewModel
-    @State private var quickLookURL: URL?
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        ZStack {
-            Group {
-                if viewModel.filteredAndSortedContents.isEmpty && !viewModel.isLoading {
-                    ContentUnavailableView(
-                        viewModel.searchText.isEmpty ? "Empty Folder" : "No Results",
-                        systemImage: viewModel.searchText.isEmpty ? "folder" : "magnifyingglass",
-                        description: Text(viewModel.searchText.isEmpty ? "This folder contains no items" : "No files match '\(viewModel.searchText)'")
-                    )
-                } else {
-                    switch viewModel.viewMode {
-                    case .list:
-                        listView
-                    case .grid:
-                        gridView
-                    case .column:
-                        listView // Column view is similar to list for now
-                    }
+        Group {
+            if viewModel.filteredAndSortedContents.isEmpty {
+                ContentUnavailableView(
+                    viewModel.searchText.isEmpty ? "Empty Folder" : "No Results",
+                    systemImage: viewModel.searchText.isEmpty ? "folder" : "magnifyingglass",
+                    description: Text(viewModel.searchText.isEmpty ? "This folder contains no items" : "No files match '\(viewModel.searchText)'")
+                )
+            } else {
+                switch viewModel.viewMode {
+                case .list:
+                    listView
+                case .grid:
+                    gridView
+                case .column:
+                    listView // Column view is similar to list for now
                 }
-            }
-
-            // Loading overlay
-            if viewModel.isLoading {
-                ProgressView()
-                    .progressViewStyle(.circular)
-                    .controlSize(.large)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(.background.opacity(0.8))
             }
         }
         .navigationTitle(viewModel.currentDirectory?.name ?? "")
-        .quickLookPreview($quickLookURL)
         .focusable(viewModel.volume != nil)
         .focused($isFocused)
         .onAppear {
@@ -477,18 +461,7 @@ struct FileListView: View {
                 }
 
                 if !urls.isEmpty {
-                    viewModel.checkWriteOperationSafety {
-                        Task {
-                            do {
-                                try await viewModel.importFiles(urls, to: directory)
-                            } catch {
-                                await MainActor.run {
-                                    viewModel.errorMessage = error.localizedDescription
-                                    viewModel.showError = true
-                                }
-                            }
-                        }
-                    }
+                    viewModel.importFiles(urls, to: directory)
                 }
             }
 
@@ -526,27 +499,33 @@ struct FileListView: View {
             .width(100)
 
             TableColumn("Type") { entry in
-                Text(entry.isDirectory ? "Folder" : typeForEntry(entry))
-                    .foregroundStyle(.secondary)
-            }
-            .width(80)
-
-            TableColumn("Permissions") { entry in
-                Text(entry.permissionString)
+                Text(entry.isDirectory ? "Folder" : entry.typeCode.fourCharacterString)
                     .font(.system(.body, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
-            .width(100)
+            .width(60)
+
+            TableColumn("Creator") { entry in
+                Text(entry.creatorCode.fourCharacterString)
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+            .width(60)
         }
         .tableStyle(.inset(alternatesRowBackgrounds: true))
         .contextMenu(forSelectionType: UInt32.self) { items in
             // Context menu items will be handled by FileRowView's contextMenu
         } primaryAction: { items in
             // Double-click action
-            handleReturnPress()
+            openSelection()
         }
         .onKeyPress(.return) {
-            handleReturnPress()
+            openSelection()
+            return .handled
+        }
+        .onKeyPress(.space) {
+            guard let entry = viewModel.selectedEntry else { return .ignored }
+            viewModel.quickLook(entry)
             return .handled
         }
     }
@@ -562,83 +541,45 @@ struct FileListView: View {
         }
     }
 
-    private func typeForEntry(_ entry: HFSFileEntry) -> String {
-        let ext = (entry.name as NSString).pathExtension
-        return ext.isEmpty ? "File" : ext.uppercased()
-    }
-
-    private func handleSpacePress() {
-        guard let selectedEntry = viewModel.selectedEntry, !selectedEntry.isDirectory else { return }
-
-        Task {
-            do {
-                let data = try selectedEntry.readData()
-                let tempURL = FileManager.default.temporaryDirectory
-                    .appendingPathComponent(selectedEntry.name)
-
-                try data.write(to: tempURL)
-
-                await MainActor.run {
-                    quickLookURL = tempURL
-                }
-            } catch {
-                print("Failed to prepare QuickLook: \(error)")
-            }
-        }
-    }
-
-    private func handleReturnPress() {
+    private func openSelection() {
         guard let selectedEntry = viewModel.selectedEntry else { return }
+        viewModel.open(selectedEntry)
+    }
+}
 
-        if selectedEntry.isDirectory {
-            viewModel.navigateTo(selectedEntry)
-        } else {
-            // Open in default app
-            Task {
-                do {
-                    let data = try selectedEntry.readData()
-                    let tempURL = FileManager.default.temporaryDirectory
-                        .appendingPathComponent(selectedEntry.name)
+// MARK: - Entry Icons
 
-                    try data.write(to: tempURL)
+extension HFSFileEntry {
+    var iconName: String {
+        if isDirectory { return "folder.fill" }
 
-                    await MainActor.run {
-                        NSWorkspace.shared.open(tempURL)
-                    }
-                } catch {
-                    print("Failed to open file: \(error)")
-                }
-            }
+        switch typeCode.fourCharacterString {
+        case "APPL": return "app"
+        case "TEXT", "ttro": return "doc.text"
+        case "PICT", "JPEG", "GIFf", "PNGf", "TIFF": return "photo"
+        case "MooV": return "film"
+        case "AIFF", "AIFC", "sfil": return "music.note"
+        default: break
+        }
+
+        let ext = (name as NSString).pathExtension.lowercased()
+        switch ext {
+        case "txt", "md", "rtf": return "doc.text"
+        case "pdf": return "doc.text.fill"
+        case "jpg", "jpeg", "png", "gif", "tiff", "bmp": return "photo"
+        case "mov", "mp4", "avi", "mkv": return "film"
+        case "mp3", "aac", "wav", "aiff": return "music.note"
+        case "zip", "gz", "tar", "dmg", "sit", "sea", "hqx": return "archivebox"
+        case "app": return "app"
+        case "plist": return "list.bullet.rectangle"
+        case "xml", "json": return "curlybraces"
+        case "h", "c", "m", "swift", "py", "js": return "chevron.left.forwardslash.chevron.right"
+        default: return "doc"
         }
     }
 
-    private func handleCopyPath() {
-        guard let selectedEntry = viewModel.selectedEntry else { return }
-
-        let path = viewModel.navigationPath.map { $0.name }.joined(separator: "/")
-        let fullPath = "/" + path
-
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(fullPath, forType: .string)
-    }
-
-    private func openFile(_ entry: HFSFileEntry) {
-        Task {
-            do {
-                let data = try entry.readData()
-                let tempURL = FileManager.default.temporaryDirectory
-                    .appendingPathComponent(entry.name)
-
-                try data.write(to: tempURL)
-
-                await MainActor.run {
-                    NSWorkspace.shared.open(tempURL)
-                }
-            } catch {
-                print("Failed to open file: \(error)")
-            }
-        }
+    var iconColor: Color {
+        isDirectory ? .blue : .secondary
     }
 }
 
@@ -650,9 +591,9 @@ struct GridItemView: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            Image(systemName: iconName)
+            Image(systemName: entry.iconName)
                 .font(.system(size: 48))
-                .foregroundStyle(iconColor)
+                .foregroundStyle(entry.iconColor)
                 .frame(height: 60)
 
             Text(entry.name)
@@ -668,130 +609,52 @@ struct GridItemView: View {
         )
         .contentShape(Rectangle())
         .onTapGesture(count: 2) {
-            if entry.isDirectory {
-                viewModel.navigateTo(entry)
-            } else {
-                openInDefaultApp()
-            }
+            viewModel.open(entry)
         }
         .onTapGesture(count: 1) {
             viewModel.selectedEntry = entry
         }
         .onDrag {
-            // Export file for dragging out of HFS
-            // Note: Directories can't be easily dragged, so we only support files
-            guard !entry.isDirectory else {
-                return NSItemProvider()
-            }
-
-            let provider = NSItemProvider()
-
-            // Register the file data with a promise
-            provider.registerFileRepresentation(forTypeIdentifier: "public.data", fileOptions: [.openInPlace], visibility: .all) { completion in
-                Task {
-                    do {
-                        let data = try entry.readData()
-                        let tempURL = FileManager.default.temporaryDirectory
-                            .appendingPathComponent(entry.name)
-                        try data.write(to: tempURL)
-                        completion(tempURL, true, nil)
-                    } catch {
-                        completion(nil, false, error)
-                    }
-                }
-                return nil
-            }
-
-            return provider
+            dragItemProvider(for: entry)
         }
         .contextMenu {
-            if entry.isDirectory {
-                Button("Open") {
-                    viewModel.navigateTo(entry)
-                }
-            } else {
-                Button("Open") {
-                    openInDefaultApp()
-                }
+            Button("Open") {
+                viewModel.open(entry)
             }
 
             Divider()
 
             Button("Copy Path") {
-                copyPath()
+                viewModel.copyPath(entry)
             }
 
-            if !entry.isDirectory {
-                Divider()
+            Divider()
 
-                Button("Export...") {
-                    // Could add export functionality here too
-                }
+            Button("Export...") {
+                viewModel.export(entry)
             }
         }
     }
+}
 
-    var iconName: String {
-        switch entry.fileType {
-        case .directory: return "folder.fill"
-        case .file: return fileIcon
-        case .symbolicLink: return "link"
-        case .unknown: return "doc"
-        }
-    }
+/// Lets files be dragged out to Finder and other apps
+private func dragItemProvider(for entry: HFSFileEntry) -> NSItemProvider {
+    let provider = NSItemProvider()
+    guard !entry.isDirectory else { return provider }
 
-    var iconColor: Color {
-        switch entry.fileType {
-        case .directory: return .blue
-        case .file: return .secondary
-        case .symbolicLink: return .purple
-        case .unknown: return .gray
-        }
-    }
-
-    var fileIcon: String {
-        let ext = (entry.name as NSString).pathExtension.lowercased()
-        switch ext {
-        case "txt", "md", "rtf": return "doc.text"
-        case "pdf": return "doc.text.fill"
-        case "jpg", "jpeg", "png", "gif", "tiff", "bmp": return "photo"
-        case "mov", "mp4", "avi", "mkv": return "film"
-        case "mp3", "aac", "wav", "aiff": return "music.note"
-        case "zip", "gz", "tar", "dmg": return "archivebox"
-        case "app": return "app"
-        case "plist": return "list.bullet.rectangle"
-        case "xml", "json": return "curlybraces"
-        case "h", "c", "m", "swift", "py", "js": return "chevron.left.forwardslash.chevron.right"
-        default: return "doc"
-        }
-    }
-
-    private func openInDefaultApp() {
-        Task {
+    provider.suggestedName = HFSName.toLocal(entry.name)
+    provider.registerFileRepresentation(forTypeIdentifier: UTType.data.identifier, fileOptions: [], visibility: .all) { completion in
+        Task { @MainActor in
             do {
-                let data = try entry.readData()
-                let tempURL = FileManager.default.temporaryDirectory
-                    .appendingPathComponent(entry.name)
-
-                try data.write(to: tempURL)
-
-                await MainActor.run {
-                    NSWorkspace.shared.open(tempURL)
-                }
+                completion(try entry.exportToTemporaryFolder(), false, nil)
             } catch {
-                print("Failed to open file: \(error)")
+                completion(nil, false, error)
             }
         }
+        return nil
     }
 
-    private func copyPath() {
-        let path = viewModel.navigationPath.map { $0.name }.joined(separator: "/")
-        let fullPath = "/" + path
-
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(fullPath, forType: .string)
-    }
+    return provider
 }
 
 // MARK: - File Row View
@@ -799,93 +662,45 @@ struct GridItemView: View {
 struct FileRowView: View {
     let entry: HFSFileEntry
     @ObservedObject var viewModel: HFSViewModel
-    @State private var showExportDialog = false
     @State private var showRenameDialog = false
     @State private var showDeleteConfirmation = false
     @State private var showNewFolderDialog = false
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: iconName)
-                .foregroundStyle(iconColor)
+            Image(systemName: entry.iconName)
+                .foregroundStyle(entry.iconColor)
 
             Text(entry.name)
                 .lineLimit(1)
-
-            if entry.isSymbolicLink, let target = entry.getSymbolicLinkTarget() {
-                Text("→ \(target)")
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
-            }
 
             Spacer(minLength: 0)
         }
         .contentShape(Rectangle())
         .onDrag {
-            // Export file for dragging out of HFS
-            // Note: Directories can't be easily dragged, so we only support files
-            guard !entry.isDirectory else {
-                return NSItemProvider()
-            }
-
-            let provider = NSItemProvider()
-
-            // Register the file data with a promise
-            provider.registerFileRepresentation(forTypeIdentifier: "public.data", fileOptions: [.openInPlace], visibility: .all) { completion in
-                Task {
-                    do {
-                        let data = try entry.readData()
-                        let tempURL = FileManager.default.temporaryDirectory
-                            .appendingPathComponent(entry.name)
-                        try data.write(to: tempURL)
-                        completion(tempURL, true, nil)
-                    } catch {
-                        completion(nil, false, error)
-                    }
-                }
-                return nil
-            }
-
-            return provider
+            dragItemProvider(for: entry)
         }
         .contextMenu {
-            if entry.isDirectory {
-                Button("Open") {
-                    viewModel.navigateTo(entry)
-                }
-            } else {
-                Button("Open") {
-                    openInDefaultApp()
-                }
+            Button("Open") {
+                viewModel.open(entry)
+            }
+
+            if !entry.isDirectory {
                 Button("Quick Look") {
-                    Task {
-                        do {
-                            let data = try entry.readData()
-                            let tempURL = FileManager.default.temporaryDirectory
-                                .appendingPathComponent(entry.name)
-                            try data.write(to: tempURL)
-                            // Trigger QuickLook via space key simulation would be complex,
-                            // so we'll just open it
-                            NSWorkspace.shared.open(tempURL)
-                        } catch {
-                            print("Failed to preview: \(error)")
-                        }
-                    }
+                    viewModel.quickLook(entry)
                 }
             }
 
             Divider()
 
             Button("Copy Path") {
-                copyPath()
+                viewModel.copyPath(entry)
             }
 
-            if !entry.isDirectory {
-                Divider()
+            Divider()
 
-                Button("Export...") {
-                    showExportDialog = true
-                }
+            Button("Export...") {
+                viewModel.export(entry)
             }
 
             // Write operations - only show if volume is writable
@@ -897,18 +712,7 @@ struct FileRowView: View {
                 }
 
                 Button("Duplicate") {
-                    viewModel.checkWriteOperationSafety {
-                        Task {
-                            do {
-                                try await viewModel.duplicateEntry(entry)
-                            } catch {
-                                await MainActor.run {
-                                    viewModel.errorMessage = error.localizedDescription
-                                    viewModel.showError = true
-                                }
-                            }
-                        }
-                    }
+                    viewModel.duplicateEntry(entry)
                 }
 
                 if entry.isDirectory {
@@ -924,16 +728,6 @@ struct FileRowView: View {
                 }
             }
         }
-        .fileExporter(
-            isPresented: $showExportDialog,
-            document: HFSFileDocument(entry: entry),
-            contentType: .data,
-            defaultFilename: entry.name
-        ) { result in
-            if case .failure(let error) = result {
-                print("Export failed: \(error)")
-            }
-        }
         .sheet(isPresented: $showRenameDialog) {
             RenameDialog(entry: entry, viewModel: viewModel)
         }
@@ -943,84 +737,10 @@ struct FileRowView: View {
         .alert("Delete \(entry.name)?", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {
-                viewModel.checkWriteOperationSafety {
-                    Task {
-                        do {
-                            try await viewModel.deleteEntry(entry)
-                        } catch {
-                            await MainActor.run {
-                                viewModel.errorMessage = error.localizedDescription
-                                viewModel.showError = true
-                            }
-                        }
-                    }
-                }
+                viewModel.deleteEntry(entry)
             }
         } message: {
             Text("This action cannot be undone.")
-        }
-    }
-
-    private func openInDefaultApp() {
-        Task {
-            do {
-                // Extract file to temp directory
-                let data = try entry.readData()
-                let tempURL = FileManager.default.temporaryDirectory
-                    .appendingPathComponent(entry.name)
-
-                try data.write(to: tempURL)
-
-                await MainActor.run {
-                    NSWorkspace.shared.open(tempURL)
-                }
-            } catch {
-                print("Failed to open file: \(error)")
-            }
-        }
-    }
-
-    private func copyPath() {
-        let path = viewModel.navigationPath.map { $0.name }.joined(separator: "/")
-        let fullPath = "/" + path
-
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(fullPath, forType: .string)
-    }
-
-    var iconName: String {
-        switch entry.fileType {
-        case .directory: return "folder.fill"
-        case .file: return fileIcon
-        case .symbolicLink: return "link"
-        case .unknown: return "doc"
-        }
-    }
-
-    var iconColor: Color {
-        switch entry.fileType {
-        case .directory: return .blue
-        case .file: return .secondary
-        case .symbolicLink: return .purple
-        case .unknown: return .gray
-        }
-    }
-
-    var fileIcon: String {
-        let ext = (entry.name as NSString).pathExtension.lowercased()
-        switch ext {
-        case "txt", "md", "rtf": return "doc.text"
-        case "pdf": return "doc.text.fill"
-        case "jpg", "jpeg", "png", "gif", "tiff", "bmp": return "photo"
-        case "mov", "mp4", "avi", "mkv": return "film"
-        case "mp3", "aac", "wav", "aiff": return "music.note"
-        case "zip", "gz", "tar", "dmg": return "archivebox"
-        case "app": return "app"
-        case "plist": return "list.bullet.rectangle"
-        case "xml", "json": return "curlybraces"
-        case "h", "c", "m", "swift", "py", "js": return "chevron.left.forwardslash.chevron.right"
-        default: return "doc"
         }
     }
 }
@@ -1031,8 +751,6 @@ struct FileInfoView: View {
     let entry: HFSFileEntry?
     @State private var previewImage: NSImage?
     @State private var previewText: String?
-    @State private var isLoadingPreview = false
-    @State private var showExportDialog = false
 
     var body: some View {
         Group {
@@ -1067,8 +785,19 @@ struct FileInfoView: View {
                         // Info sections
                         InfoSection(title: "General") {
                             InfoRow(label: "Size", value: entry.formattedSize)
-                            InfoRow(label: "Type", value: typeDescription(for: entry))
+                            if !entry.isDirectory {
+                                InfoRow(label: "Data Fork", value: formatBytes(entry.dataSize))
+                                InfoRow(label: "Resource Fork", value: formatBytes(entry.resourceSize))
+                            }
                             InfoRow(label: "Identifier", value: String(entry.id))
+                        }
+
+                        if !entry.isDirectory {
+                            InfoSection(title: "Finder Info") {
+                                InfoRow(label: "Type", value: entry.typeCode.fourCharacterString)
+                                InfoRow(label: "Creator", value: entry.creatorCode.fourCharacterString)
+                                InfoRow(label: "Locked", value: entry.isLocked ? "Yes" : "No")
+                            }
                         }
 
                         InfoSection(title: "Dates") {
@@ -1077,21 +806,6 @@ struct FileInfoView: View {
                             }
                             if let date = entry.modificationDate {
                                 InfoRow(label: "Modified", value: formatDate(date))
-                            }
-                            if let date = entry.accessDate {
-                                InfoRow(label: "Accessed", value: formatDate(date))
-                            }
-                        }
-
-                        InfoSection(title: "Permissions") {
-                            InfoRow(label: "Mode", value: entry.permissionString)
-                            InfoRow(label: "Owner", value: String(entry.ownerID))
-                            InfoRow(label: "Group", value: String(entry.groupID))
-                        }
-
-                        if entry.isSymbolicLink, let target = entry.getSymbolicLinkTarget() {
-                            InfoSection(title: "Link") {
-                                InfoRow(label: "Target", value: target)
                             }
                         }
 
@@ -1119,10 +833,7 @@ struct FileInfoView: View {
     @ViewBuilder
     private func previewSection(for entry: HFSFileEntry) -> some View {
         VStack(spacing: 8) {
-            if isLoadingPreview {
-                ProgressView()
-                    .frame(height: 150)
-            } else if let image = previewImage {
+            if let image = previewImage {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
@@ -1151,47 +862,34 @@ struct FileInfoView: View {
         guard !entry.isDirectory else { return }
 
         let ext = (entry.name as NSString).pathExtension.lowercased()
+        let type = entry.typeCode.fourCharacterString
 
-        Task {
-            isLoadingPreview = true
-            defer { isLoadingPreview = false }
-
-            do {
-                // Try image preview
-                if ["jpg", "jpeg", "png", "gif", "tiff", "bmp", "pict", "pct"].contains(ext) {
-                    let data = try entry.readData()
-                    if let image = NSImage(data: data) {
-                        await MainActor.run {
-                            self.previewImage = image
-                        }
-                        return
-                    }
+        do {
+            // Try image preview
+            if ["jpg", "jpeg", "png", "gif", "tiff", "bmp"].contains(ext) || ["JPEG", "GIFf", "PNGf", "TIFF"].contains(type) {
+                let data = try entry.readData(maxBytes: 10 * 1024 * 1024)
+                if let image = NSImage(data: data) {
+                    previewImage = image
+                    return
                 }
-
-                // Try text preview
-                if ["txt", "md", "rtf", "c", "h", "m", "swift", "py", "js", "json", "xml", "html", "css", "sh", "log", "plist"].contains(ext) {
-                    let data = try entry.readData(maxBytes: 5000) // Limit to first 5KB
-                    if let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .macOSRoman) {
-                        await MainActor.run {
-                            self.previewText = text.prefix(1000).description + (text.count > 1000 ? "\n..." : "")
-                        }
-                    }
-                }
-            } catch {
-                // Silently fail - preview just won't show
             }
+
+            // Try text preview
+            if type == "TEXT" || ["txt", "md", "rtf", "c", "h", "m", "swift", "py", "js", "json", "xml", "html", "css", "sh", "log", "plist"].contains(ext) {
+                let data = try entry.readData(maxBytes: 5000) // Limit to first 5KB
+                if let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .macOSRoman) {
+                    // Classic Mac text uses CR line endings
+                    let lines = text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+                    previewText = lines.prefix(1000).description + (lines.count > 1000 ? "\n..." : "")
+                }
+            }
+        } catch {
+            // Silently fail - preview just won't show
         }
     }
 
-    func typeDescription(for entry: HFSFileEntry) -> String {
-        switch entry.fileType {
-        case .directory: return "Folder"
-        case .file:
-            let ext = (entry.name as NSString).pathExtension
-            return ext.isEmpty ? "File" : "\(ext.uppercased()) File"
-        case .symbolicLink: return "Symbolic Link"
-        case .unknown: return "Unknown"
-        }
+    func formatBytes(_ bytes: UInt64) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
     }
 
     func formatDate(_ date: Date) -> String {
@@ -1287,18 +985,7 @@ struct RenameDialog: View {
         let name = newName
         dismiss()
 
-        viewModel.checkWriteOperationSafety {
-            Task {
-                do {
-                    try await viewModel.renameEntry(entry, to: name)
-                } catch {
-                    await MainActor.run {
-                        viewModel.errorMessage = error.localizedDescription
-                        viewModel.showError = true
-                    }
-                }
-            }
-        }
+        viewModel.renameEntry(entry, to: name)
     }
 }
 
@@ -1346,18 +1033,7 @@ struct NewFolderDialog: View {
         let name = folderName
         dismiss()
 
-        viewModel.checkWriteOperationSafety {
-            Task {
-                do {
-                    try await viewModel.createFolder(name: name, in: directory)
-                } catch {
-                    await MainActor.run {
-                        viewModel.errorMessage = error.localizedDescription
-                        viewModel.showError = true
-                    }
-                }
-            }
-        }
+        viewModel.createFolder(name: name, in: directory)
     }
 }
 

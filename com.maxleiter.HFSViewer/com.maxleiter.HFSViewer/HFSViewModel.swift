@@ -20,10 +20,11 @@
 //  along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
 
+
+import AppKit
 import Foundation
 import SwiftUI
 import Combine
-import UniformTypeIdentifiers
 
 enum ViewMode: String, CaseIterable {
     case list = "List"
@@ -58,17 +59,17 @@ class HFSViewModel: ObservableObject {
     @Published var directoryContents: [HFSFileEntry] = []
     @Published var selectedEntry: HFSFileEntry?
     @Published var navigationPath: [HFSFileEntry] = []
-    @Published var isLoading: Bool = false
     @Published var errorMessage: String?
     @Published var showError: Bool = false
     @Published var viewMode: ViewMode = .list
     @Published var searchText: String = ""
     @Published var sortField: SortField = .name
     @Published var sortOrder: SortOrder = .ascending
-    @Published var operationInProgress: Bool = false
-    @Published var operationProgress: Double = 0.0
     @Published var showWriteWarning: Bool = false
     @Published var pendingOperation: (() -> Void)?
+    @Published var quickLookURL: URL?
+    /// Bumped after every write so views holding their own listings reload
+    @Published var contentVersion = 0
 
     let preferences = UserPreferences()
 
@@ -105,13 +106,11 @@ class HFSViewModel: ObservableObject {
             case .name:
                 result = entry1.name.localizedCompare(entry2.name) == .orderedAscending
             case .size:
-                result = entry1.dataSize < entry2.dataSize
+                result = entry1.size < entry2.size
             case .modified:
                 result = (entry1.modificationDate ?? .distantPast) < (entry2.modificationDate ?? .distantPast)
             case .type:
-                let ext1 = (entry1.name as NSString).pathExtension
-                let ext2 = (entry2.name as NSString).pathExtension
-                result = ext1.localizedCompare(ext2) == .orderedAscending
+                result = entry1.typeCode.fourCharacterString < entry2.typeCode.fourCharacterString
             }
 
             return sortOrder == .ascending ? result : !result
@@ -129,26 +128,55 @@ class HFSViewModel: ObservableObject {
         }
     }
 
-    func openVolume(at url: URL) {
-        isLoading = true
-        errorMessage = nil
+    private func present(_ error: Error) {
+        present(error.localizedDescription)
+    }
 
-        Task {
+    private func present(_ message: String) {
+        errorMessage = message
+        showError = true
+    }
+
+    // MARK: - Opening and Closing
+
+    func showOpenPanel(mode: HFSVolumeMode) {
+        let panel = NSOpenPanel()
+        panel.message = "Choose an HFS disk image"
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        openVolume(at: url.path, mode: mode)
+    }
+
+    func openVolume(at path: String, mode: HFSVolumeMode, partition: Int32? = nil) {
+        closeVolume()
+
+        do {
+            show(try HFSVolume(path: path, mode: mode, partition: partition))
+        } catch let writeError where mode == .readWrite {
+            // Fall back to read-only, e.g. for read-only images or locked volumes
             do {
-                let newVolume = try HFSVolume(path: url.path)
-                self.volume = newVolume
-                self.currentDirectory = newVolume.rootEntry
-                self.navigationPath = []
-
-                if let root = newVolume.rootEntry {
-                    self.navigationPath = [root]
-                    try await loadDirectoryContents(for: root)
-                }
+                show(try HFSVolume(path: path, mode: .readOnly, partition: partition))
+                present("Opened read-only: \(writeError.localizedDescription)")
             } catch {
-                self.errorMessage = error.localizedDescription
-                self.showError = true
+                present(error)
             }
-            self.isLoading = false
+        } catch {
+            present(error)
+        }
+    }
+
+    func openPartition(_ partition: HFSPartition) {
+        guard let volume, partition.number != volume.partition else { return }
+        openVolume(at: volume.path, mode: volume.mode, partition: partition.number)
+    }
+
+    private func show(_ volume: HFSVolume) {
+        self.volume = volume
+        if let root = volume.rootEntry {
+            navigateTo(root)
         }
     }
 
@@ -159,8 +187,11 @@ class HFSViewModel: ObservableObject {
         directoryContents = []
         selectedEntry = nil
         navigationPath = []
+        quickLookURL = nil
         directoryCache.removeAll()
     }
+
+    // MARK: - Navigation
 
     func navigateTo(_ entry: HFSFileEntry) {
         guard entry.isDirectory else {
@@ -168,78 +199,91 @@ class HFSViewModel: ObservableObject {
             return
         }
 
-        // Check cache first for instant navigation
+        let contents: [HFSFileEntry]
         if let cached = directoryCache[entry.id] {
-            currentDirectory = entry
-
-            // Update navigation path
-            if let index = navigationPath.firstIndex(where: { $0.id == entry.id }) {
-                navigationPath = Array(navigationPath.prefix(through: index))
-            } else {
-                navigationPath.append(entry)
+            contents = cached
+        } else {
+            do {
+                contents = try entry.getChildren()
+            } catch {
+                present(error)
+                return
             }
-
-            directoryContents = cached
-            selectedEntry = nil
-            return
+            directoryCache[entry.id] = contents
         }
 
-        // Not in cache, load from filesystem
-        Task {
-            isLoading = true
-            do {
-                currentDirectory = entry
+        currentDirectory = entry
+        updateNavigationPath(for: entry)
+        directoryContents = contents
+        selectedEntry = nil
+    }
 
-                // Update navigation path
-                if let index = navigationPath.firstIndex(where: { $0.id == entry.id }) {
-                    navigationPath = Array(navigationPath.prefix(through: index))
-                } else {
-                    navigationPath.append(entry)
-                }
-
-                try await loadDirectoryContents(for: entry)
-            } catch {
-                errorMessage = error.localizedDescription
-                showError = true
-            }
-            isLoading = false
+    private func updateNavigationPath(for entry: HFSFileEntry) {
+        if let index = navigationPath.firstIndex(where: { $0.id == entry.id }) {
+            navigationPath = Array(navigationPath.prefix(through: index))
+        } else if navigationPath.last?.id == entry.parentID {
+            navigationPath.append(entry)
+        } else if let volume {
+            // e.g. a folder picked in the sidebar from another branch
+            navigationPath = volume.entries(alongPath: entry.classicEntryPath)
         }
     }
 
     func navigateUp() {
         guard navigationPath.count > 1 else { return }
-        navigationPath.removeLast()
-        if let parent = navigationPath.last {
-            navigateTo(parent)
-        }
-    }
-
-    func navigateToRoot() {
-        guard let root = volume?.rootEntry else { return }
-        navigationPath = []
-        navigateTo(root)
-    }
-
-    private func loadDirectoryContents(for entry: HFSFileEntry) async throws {
-        let children = try entry.getChildren()
-        await MainActor.run {
-            // Store in cache for instant future navigation
-            self.directoryCache[entry.id] = children
-            self.directoryContents = children
-            self.selectedEntry = nil
-        }
+        navigateTo(navigationPath[navigationPath.count - 2])
     }
 
     func refresh() {
         guard let current = currentDirectory else { return }
-        // Clear cache for current directory to force reload
-        directoryCache.removeValue(forKey: current.id)
+        directoryCache.removeAll()
         navigateTo(current)
     }
 
-    // Get breadcrumb path string
-    var breadcrumbPath: String {
-        "/" + navigationPath.dropFirst().map { $0.name }.joined(separator: "/")
+    // MARK: - Files
+
+    func open(_ entry: HFSFileEntry) {
+        guard !entry.isDirectory else {
+            navigateTo(entry)
+            return
+        }
+        do {
+            NSWorkspace.shared.open(try entry.exportToTemporaryFolder())
+        } catch {
+            present(error)
+        }
+    }
+
+    func quickLook(_ entry: HFSFileEntry) {
+        guard !entry.isDirectory else { return }
+        do {
+            quickLookURL = try entry.exportToTemporaryFolder()
+        } catch {
+            present(error)
+        }
+    }
+
+    func copyPath(_ entry: HFSFileEntry) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(entry.displayPath, forType: .string)
+    }
+
+    func export(_ entry: HFSFileEntry) {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = HFSName.toLocal(entry.name)
+        panel.canCreateDirectories = true
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            // The panel has already confirmed replacing an existing item
+            if FileManager.default.fileExists(atPath: url.path) {
+                try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+            }
+            try entry.export(to: url)
+        } catch {
+            present(error)
+        }
     }
 
     // MARK: - Write Operations
@@ -263,209 +307,72 @@ class HFSViewModel: ObservableObject {
         operation()
     }
 
-    func openVolumeWithMode(at url: URL, mode: HFSVolumeMode) {
-        isLoading = true
-        errorMessage = nil
+    /// Runs a write (after the device warning, if needed) and saves it to the medium
+    private func performWrite(_ operation: @escaping (HFSVolume) throws -> Void) {
+        checkWriteOperationSafety { [weak self] in
+            guard let self, let volume = self.volume else { return }
 
-        Task {
             do {
-                let newVolume = try HFSVolume(path: url.path, mode: mode)
-                self.volume = newVolume
-                self.currentDirectory = newVolume.rootEntry
-                self.navigationPath = []
-
-                if let root = newVolume.rootEntry {
-                    self.navigationPath = [root]
-                    try await loadDirectoryContents(for: root)
-                }
+                try operation(volume)
             } catch {
-                // If write mode failed, try falling back to read-only
-                if mode == .readWrite {
-                    do {
-                        let newVolume = try HFSVolume(path: url.path, mode: .readOnly)
-                        self.volume = newVolume
-                        self.currentDirectory = newVolume.rootEntry
-                        self.navigationPath = []
-
-                        if let root = newVolume.rootEntry {
-                            self.navigationPath = [root]
-                            try await loadDirectoryContents(for: root)
-                        }
-
-                        // Show warning that we opened in read-only mode
-                        self.errorMessage = "Opened in read-only mode: insufficient permissions for write access"
-                        self.showError = true
-                    } catch {
-                        self.errorMessage = error.localizedDescription
-                        self.showError = true
-                    }
-                } else {
-                    self.errorMessage = error.localizedDescription
-                    self.showError = true
-                }
+                self.present(error)
             }
-            self.isLoading = false
-        }
-    }
 
-    func deleteEntry(_ entry: HFSFileEntry) async throws {
-        guard volume != nil else {
-            throw HFSError.operationFailed("No volume mounted")
-        }
-
-        operationInProgress = true
-        defer { operationInProgress = false }
-
-        try entry.delete()
-        refresh()
-    }
-
-    func renameEntry(_ entry: HFSFileEntry, to newName: String) async throws {
-        operationInProgress = true
-        defer { operationInProgress = false }
-
-        try entry.rename(to: newName)
-        refresh()
-    }
-
-    func createFolder(name: String, in directory: HFSFileEntry) async throws {
-        guard let volume = volume else {
-            throw HFSError.operationFailed("No volume mounted")
-        }
-
-        operationInProgress = true
-        defer { operationInProgress = false }
-
-        // Build path for new folder
-        let folderPath = directory.classicEntryPath == ":" ?
-            ":\(name)" : "\(directory.classicEntryPath):\(name)"
-
-        _ = try volume.createDirectory(at: folderPath)
-        refresh()
-    }
-
-    func importFiles(_ urls: [URL], to directory: HFSFileEntry) async throws {
-        guard let volume = volume else {
-            throw HFSError.operationFailed("No volume mounted")
-        }
-        guard directory.isDirectory else {
-            throw HFSError.operationFailed("Destination must be a folder")
-        }
-
-        operationInProgress = true
-        defer { operationInProgress = false }
-
-        for (index, url) in urls.enumerated() {
-            operationProgress = Double(index) / Double(urls.count)
-
-            let fileName = url.lastPathComponent
-            let destPath = directory.classicEntryPath == ":" ?
-                ":\(fileName)" : "\(directory.classicEntryPath):\(fileName)"
-
-            // Check if it's a directory
-            var isDirectory: ObjCBool = false
-            FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
-
-            if isDirectory.boolValue {
-                // Import directory recursively
-                try await importDirectory(url, to: destPath, volume: volume)
-            } else {
-                // Import file
-                try volume.importFile(sourcePath: url, destinationPath: destPath)
+            // Flush even after a failure so the medium matches what libhfs has applied
+            do {
+                try volume.flush()
+            } catch {
+                self.present(error)
             }
-        }
 
-        operationProgress = 1.0
-        refresh()
+            self.contentVersion += 1
+            self.refresh()
+        }
     }
 
-    private func importDirectory(_ sourceURL: URL, to destPath: String, volume: HFSVolume) async throws {
-        // Create directory
-        _ = try volume.createDirectory(at: destPath)
+    func deleteEntry(_ entry: HFSFileEntry) {
+        performWrite { _ in try entry.delete() }
+    }
 
-        // Import contents
-        let contents = try FileManager.default.contentsOfDirectory(
-            at: sourceURL,
-            includingPropertiesForKeys: nil
-        )
+    func renameEntry(_ entry: HFSFileEntry, to newName: String) {
+        performWrite { _ in try entry.rename(to: newName) }
+    }
 
-        for itemURL in contents {
-            let itemName = itemURL.lastPathComponent
-            let itemDestPath = "\(destPath):\(itemName)"
+    func createFolder(name: String, in directory: HFSFileEntry) {
+        performWrite { volume in
+            // Check before building the path, as a ":" would read as a path separator
+            try HFSName.validate(name)
+            try volume.createDirectory(at: HFSName.path(directory.classicEntryPath, name))
+        }
+    }
 
-            var isDirectory: ObjCBool = false
-            FileManager.default.fileExists(atPath: itemURL.path, isDirectory: &isDirectory)
+    func importFiles(_ urls: [URL], to directory: HFSFileEntry) {
+        guard directory.isDirectory else { return }
 
-            if isDirectory.boolValue {
-                try await importDirectory(itemURL, to: itemDestPath, volume: volume)
-            } else {
-                try volume.importFile(sourcePath: itemURL, destinationPath: itemDestPath)
+        performWrite { volume in
+            for url in urls {
+                let name = HFSName.fromLocal(url.lastPathComponent)
+                try volume.importItem(from: url, to: HFSName.path(directory.classicEntryPath, name))
             }
         }
     }
 
-    func exportEntries(_ entries: [HFSFileEntry], to destinationURL: URL) async throws {
-        operationInProgress = true
-        defer { operationInProgress = false }
+    func duplicateEntry(_ entry: HFSFileEntry) {
+        performWrite { volume in
+            var copyName = Self.copyName(for: entry.name, suffix: " copy")
+            var counter = 2
 
-        for (index, entry) in entries.enumerated() {
-            operationProgress = Double(index) / Double(entries.count)
-
-            let fileURL = destinationURL.appendingPathComponent(entry.name)
-
-            if entry.isDirectory {
-                // Recursive directory export
-                try FileManager.default.createDirectory(
-                    at: fileURL,
-                    withIntermediateDirectories: true
-                )
-                let children = try entry.getChildren()
-                try await exportEntries(children, to: fileURL)
-            } else {
-                // Export file
-                let data = try entry.readData()
-                try data.write(to: fileURL)
-            }
-        }
-
-        operationProgress = 1.0
-    }
-
-    func duplicateEntry(_ entry: HFSFileEntry) async throws {
-        guard let volume = volume else {
-            throw HFSError.operationFailed("No volume mounted")
-        }
-
-        operationInProgress = true
-        defer { operationInProgress = false }
-
-        // Generate a unique name
-        var copyName = "\(entry.name) copy"
-        var counter = 2
-        let parentPath = entry.classicEntryPath.components(separatedBy: ":").dropLast().joined(separator: ":")
-        let basePath = parentPath.isEmpty ? ":" : parentPath
-
-        while true {
-            let testPath = basePath == ":" ? ":\(copyName)" : "\(basePath):\(copyName)"
-
-            if !volume.pathExists(testPath) {
-                // Path doesn't exist, we can use it
-                try entry.copyTo(destinationPath: testPath)
-                break
+            while volume.pathExists(HFSName.path(entry.parentPath, copyName)) {
+                copyName = Self.copyName(for: entry.name, suffix: " copy \(counter)")
+                counter += 1
             }
 
-            copyName = "\(entry.name) copy \(counter)"
-            counter += 1
+            try entry.copy(to: HFSName.path(entry.parentPath, copyName))
         }
-
-        refresh()
     }
-}
 
-// MARK: - UTType Extension for HFS
-
-extension UTType {
-    static var hfsImage: UTType {
-        UTType(filenameExtension: "dmg") ?? .diskImage
+    /// Appends `suffix`, shortening the name to fit HFS's 31-character limit
+    private static func copyName(for name: String, suffix: String) -> String {
+        String(name.prefix(Int(HFS_MAX_FLEN) - suffix.count)) + suffix
     }
 }
